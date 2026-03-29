@@ -15,7 +15,16 @@ interface THBCamera {
   lon?: number | string;
   lat?: number | string;
   url?: string;
+  html?: string;
+  videoliveurl?: string;
+  VideoLiveUrl?: string;
+  liveurl?: string;
+  LiveUrl?: string;
   snapshoturl?: string;
+  snapshotUrl?: string;
+  thumbnailurl?: string;
+  ThumbnailUrl?: string;
+  stakenumber?: string;
   [key: string]: unknown;
 }
 
@@ -30,9 +39,22 @@ function mapTHB(raw: THBCamera, type: 'provincial' | 'county'): Camera | null {
     (raw.location as string) ??
     (raw.roadname as string) ??
     (raw.RoadName as string) ??
+    (raw.stakenumber as string) ??
     id;
-  const streamUrl = (raw.url as string) ?? '';
-  const snapshotUrl = (raw.snapshoturl as string) ?? undefined;
+  
+  // THB uses 'html' field for stream URL, try multiple field names
+  let streamUrl = (raw.html as string) ?? 
+                  (raw.url as string) ?? 
+                  (raw.videoliveurl as string) ?? 
+                  (raw.VideoLiveUrl as string) ??
+                  (raw.liveurl as string) ?? 
+                  (raw.LiveUrl as string) ?? '';
+  
+  const snapshotUrl = (raw.snapshoturl as string) ?? 
+                      (raw.snapshotUrl as string) ??
+                      (raw.thumbnailurl as string) ?? 
+                      (raw.ThumbnailUrl as string) ??
+                      undefined;
 
   return {
     id: `${type}-${id}`,
@@ -42,7 +64,7 @@ function mapTHB(raw: THBCamera, type: 'provincial' | 'county'): Camera | null {
     lng,
     streamUrl,
     snapshotUrl,
-    road: (raw.roadname as string) ?? (raw.RoadName as string),
+    road: (raw.roadname as string) ?? (raw.RoadName as string) ?? (raw.stakenumber as string),
   };
 }
 
@@ -56,7 +78,19 @@ async function fetchTHB(url: string, type: 'provincial' | 'county'): Promise<Cam
   const data: THBCamera[] | { data?: THBCamera[] } = await res.json();
   const items: THBCamera[] = Array.isArray(data) ? data : (data?.data ?? []);
 
-  return items.map((c) => mapTHB(c, type)).filter((c): c is Camera => c !== null);
+  console.log(`[thb/${type}] fetched ${items.length} items`);
+  if (items.length > 0) {
+    console.log(`[thb/${type}] sample item:`, JSON.stringify(items[0], null, 2));
+    const withUrl = items.filter((c) => c.url || c.videoliveurl || c.VideoLiveUrl || c.liveurl || c.LiveUrl).length;
+    console.log(`[thb/${type}] items with url: ${withUrl}/${items.length}`);
+  }
+
+  const result = items.map((c) => mapTHB(c, type)).filter((c): c is Camera => c !== null);
+  console.log(`[thb/${type}] mapped to ${result.length} cameras`);
+  if (result.length > 0) {
+    console.log(`[thb/${type}] sample camera:`, result[0]);
+  }
+  return result;
 }
 
 export async function fetchProvincialCameras(): Promise<Camera[]> {

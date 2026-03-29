@@ -23,6 +23,44 @@ export default function HomePage() {
   const [view, setView] = useState<View>('map');
   const [selected, setSelected] = useState<Camera | null>(null);
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [sortByNearest, setSortByNearest] = useState(false);
+
+  const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const toRad = (v: number) => (v * Math.PI) / 180;
+    const R = 6371e3; // meters
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δφ = toRad(lat2 - lat1);
+    const Δλ = toRad(lng2 - lng1);
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const locateMe = () => {
+    if (!navigator.geolocation) {
+      setError('此瀏覽器不支援地理定位');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setError(null);
+      },
+      (err) => {
+        setError(`定位失敗：${err.message}`);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   useEffect(() => {
     fetch('/api/cameras')
@@ -33,20 +71,51 @@ export default function HomePage() {
       .then((data: Camera[]) => setCameras(data))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+
+    // Auto-locate on mount
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        () => {
+          // 定位失敗時靜默，不顯示錯誤
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
   }, []);
 
   const handleSelect = useCallback((c: Camera) => setSelected(c), []);
 
-  const filtered = cameras.filter((c) => {
-    if (typeFilter !== 'all' && c.type !== typeFilter) return false;
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.id.toLowerCase().includes(q) ||
-      (c.road?.toLowerCase().includes(q) ?? false)
-    );
-  });
+  const filtered = cameras
+    .filter((c) => {
+      if (typeFilter !== 'all' && c.type !== typeFilter) return false;
+      if (!query) return true;
+      const q = query.toLowerCase();
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q) ||
+        (c.road?.toLowerCase().includes(q) ?? false)
+      );
+    })
+    .map((c) => {
+      if (!userLocation) return { camera: c, distance: Infinity };
+      return {
+        camera: c,
+        distance: getDistance(userLocation.lat, userLocation.lng, c.lat, c.lng),
+      };
+    });
+
+  const sorted =
+    sortByNearest && userLocation
+      ? [...filtered].sort((a, b) => a.distance - b.distance)
+      : filtered;
+
+  const filteredCameras = sorted.map((item) => item.camera);
 
   const counts = {
     all: cameras.length,
@@ -91,7 +160,7 @@ export default function HomePage() {
       </header>
 
       {/* Filter bar */}
-      <div className="bg-white border-b border-gray-100 px-4 py-2 flex items-center gap-2 shrink-0 overflow-x-auto">
+      <div className="bg-white border-b border-gray-100 px-4 py-2 flex flex-wrap items-center gap-2 shrink-0 overflow-x-auto">
         {(['all', 'freeway', 'provincial', 'county'] as const).map((t) => (
           <button
             key={t}
@@ -105,6 +174,32 @@ export default function HomePage() {
             {t === 'all' ? `全部 (${counts.all})` : `${TYPE_LABEL[t]} (${counts[t]})`}
           </button>
         ))}
+
+        <button
+          onClick={locateMe}
+          className="shrink-0 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+        >
+          定位我
+        </button>
+
+        <button
+          onClick={() => setSortByNearest((v) => !v)}
+          disabled={!userLocation}
+          className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+            sortByNearest
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          } ${!userLocation ? 'opacity-40 cursor-not-allowed' : ''}`}
+        >
+          離我最近
+        </button>
+
+        {userLocation && (
+          <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">
+            目前位置：{userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+          </span>
+        )}
+
         {loading && (
           <span className="text-xs text-gray-400 ml-2">載入中…</span>
         )}
@@ -128,11 +223,16 @@ export default function HomePage() {
           </div>
         ) : view === 'map' ? (
           <div className="h-full p-3">
-            <Map cameras={filtered} query="" onSelect={handleSelect} />
+            <Map
+              cameras={filteredCameras}
+              query={query}
+              onSelect={handleSelect}
+              userLocation={userLocation}
+            />
           </div>
         ) : (
           <div className="h-full overflow-y-auto p-4">
-            <CameraList cameras={filtered} query="" onSelect={handleSelect} />
+            <CameraList cameras={filteredCameras} query={query} onSelect={handleSelect} />
           </div>
         )}
       </main>

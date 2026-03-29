@@ -22,24 +22,42 @@ interface Props {
 
 export default function CameraCard({ camera, onClick }: Props) {
   const [imgError, setImgError] = useState(false);
-  const proxyUrl = camera.streamUrl
-    ? `/api/proxy/image?url=${encodeURIComponent(camera.streamUrl)}`
+  const [imgLoading, setImgLoading] = useState(true);
+  const sourceLabel = camera.snapshotUrl ? '抓圖來源' : '直播來源';
+  const proxyUrl = (camera.snapshotUrl || camera.streamUrl)
+    ? `/api/proxy/image?url=${encodeURIComponent(camera.snapshotUrl ?? camera.streamUrl)}&t=${camera.id}`
     : null;
 
   return (
     <div
-      className="rounded-xl border border-gray-200 overflow-hidden cursor-pointer
-        hover:shadow-lg hover:border-blue-400 transition-all group bg-white"
+      className="rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg hover:border-blue-400 transition-all group bg-white"
       onClick={() => onClick(camera)}
     >
       <div className="relative aspect-video bg-gray-100 overflow-hidden">
+        <span className="absolute right-2 top-2 z-10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white rounded-full bg-black/70">
+          {sourceLabel}
+        </span>
         {proxyUrl && !imgError ? (
-          <img
-            src={proxyUrl}
-            alt={camera.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-            onError={() => setImgError(true)}
-          />
+          <>
+            {imgLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-200 z-20">
+                <div className="animate-pulse">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                  </svg>
+                </div>
+              </div>
+            )}
+            <img
+              loading="lazy"
+              src={proxyUrl}
+              alt={camera.name}
+              className={`w-full h-full object-cover group-hover:scale-105 transition-transform ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
+              onLoad={() => setImgLoading(false)}
+              onError={() => { setImgLoading(false); setImgError(true); }}
+            />
+          </>
         ) : (
           <div className="flex items-center justify-center h-full text-gray-400">
             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">

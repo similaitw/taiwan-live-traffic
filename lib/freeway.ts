@@ -16,35 +16,46 @@ interface RawCCTV {
 }
 
 export async function fetchFreewayCameras(): Promise<Camera[]> {
-  const res = await fetch(CCTV_INFO_URL, {
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) throw new Error(`Freeway fetch failed: ${res.status}`);
+  try {
+    const res = await fetch(CCTV_INFO_URL, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      console.warn(`[freeway] fetch failed: ${res.status}, returning empty list`);
+      return [];
+    }
 
-  const buf = Buffer.from(await res.arrayBuffer());
-  const xml = gunzipSync(buf).toString('utf-8');
+    const buf = Buffer.from(await res.arrayBuffer());
+    const xml = gunzipSync(buf).toString('utf-8');
 
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    parseAttributeValue: true,
-    parseTagValue: true,
-  });
-  const parsed = parser.parse(xml);
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      parseAttributeValue: true,
+      parseTagValue: true,
+    });
+    const parsed = parser.parse(xml);
 
-  const items: RawCCTV[] = parsed?.CCTVInfo?.CCTV ?? [];
-  const list = Array.isArray(items) ? items : [items];
+    const items: RawCCTV[] = parsed?.CCTVInfo?.CCTV ?? [];
+    const list = Array.isArray(items) ? items : [items];
 
-  return list
-    .filter((c) => c.PositionLat && c.PositionLon)
-    .map((c) => ({
-      id: `freeway-${c.CCTV_ID}`,
-      name: c.RoadName
-        ? `${c.RoadName}${c.LocationMile ? ` ${c.LocationMile}K` : ''}`
-        : c.CCTV_ID,
-      type: 'freeway' as const,
-      lat: Number(c.PositionLat),
-      lng: Number(c.PositionLon),
-      streamUrl: `${STREAM_BASE}${c.CCTV_ID}`,
-      road: c.RoadName,
-    }));
+    const result = list
+      .filter((c) => c.PositionLat && c.PositionLon)
+      .map((c) => ({
+        id: `freeway-${c.CCTV_ID}`,
+        name: c.RoadName
+          ? `${c.RoadName}${c.LocationMile ? ` ${c.LocationMile}K` : ''}`
+          : c.CCTV_ID,
+        type: 'freeway' as const,
+        lat: Number(c.PositionLat),
+        lng: Number(c.PositionLon),
+        streamUrl: `${STREAM_BASE}${c.CCTV_ID}`,
+        road: c.RoadName,
+      }));
+
+    console.log(`[freeway] fetched ${result.length} cameras`);
+    return result;
+  } catch (error) {
+    console.warn(`[freeway] error:`, error instanceof Error ? error.message : String(error), ', returning empty list');
+    return [];
+  }
 }

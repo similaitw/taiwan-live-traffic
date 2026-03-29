@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Camera } from '@/types/camera';
 import CameraCard from './CameraCard';
 
-const PAGE_SIZE = 20;
+const INITIAL_LOAD = 4;
+const INCREMENT = 12;
 
 interface Props {
   cameras: Camera[];
@@ -13,7 +14,9 @@ interface Props {
 }
 
 export default function CameraList({ cameras, query, onSelect }: Props) {
-  const [page, setPage] = useState(1);
+  const [displayCount, setDisplayCount] = useState(INITIAL_LOAD);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const endRef = useRef<HTMLDivElement>(null);
 
   const filtered = cameras.filter((c) => {
     if (!query) return true;
@@ -25,13 +28,26 @@ export default function CameraList({ cameras, query, onSelect }: Props) {
     );
   });
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visible = filtered.slice(0, displayCount);
 
-  const handlePage = (p: number) => {
-    setPage(p);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  // 無限卷軸邏輯
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && displayCount < filtered.length) {
+          setDisplayCount((prev) => Math.min(prev + INCREMENT, filtered.length));
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    if (endRef.current) {
+      observer.observe(endRef.current);
+    }
+
+    observerRef.current = observer;
+    return () => observer.disconnect();
+  }, [displayCount, filtered.length]);
 
   if (filtered.length === 0) {
     return (
@@ -47,48 +63,17 @@ export default function CameraList({ cameras, query, onSelect }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-xs text-gray-500">共 {filtered.length} 台監視器</p>
+      <p className="text-xs text-gray-500">已載入 {visible.length} / {filtered.length} 台監視器</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {visible.map((c) => (
           <CameraCard key={c.id} camera={c} onClick={onSelect} />
         ))}
       </div>
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-1 py-4">
-          <button
-            onClick={() => handlePage(Math.max(1, page - 1))}
-            disabled={page === 1}
-            className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-40
-              hover:bg-gray-50 transition-colors"
-          >
-            上一頁
-          </button>
-          {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-            const start = Math.max(1, Math.min(page - 3, totalPages - 6));
-            const p = start + i;
-            if (p > totalPages) return null;
-            return (
-              <button
-                key={p}
-                onClick={() => handlePage(p)}
-                className={`w-8 h-8 text-sm rounded border transition-colors ${
-                  p === page
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                {p}
-              </button>
-            );
-          })}
-          <button
-            onClick={() => handlePage(Math.min(totalPages, page + 1))}
-            disabled={page === totalPages}
-            className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-40
-              hover:bg-gray-50 transition-colors"
-          >
-            下一頁
-          </button>
+      
+      {/* 無限卷軸觸發點 */}
+      {displayCount < filtered.length && (
+        <div ref={endRef} className="flex justify-center py-6">
+          <div className="w-6 h-6 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin" />
         </div>
       )}
     </div>
