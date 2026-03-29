@@ -1,4 +1,9 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  serverExternalPackages: ['zlib'],
+  experimental: {
+    serverComponentsExternalPackages: ['zlib'],
+  },
+};
 
 export default nextConfig;

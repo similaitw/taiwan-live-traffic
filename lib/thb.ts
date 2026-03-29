@@ -49,7 +49,7 @@ function mapTHB(raw: THBCamera, type: 'provincial' | 'county'): Camera | null {
 async function fetchTHB(url: string, type: 'provincial' | 'county'): Promise<Camera[]> {
   const res = await fetch(url, {
     next: { revalidate: 300 },
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`THB fetch failed (${type}): ${res.status}`);
 

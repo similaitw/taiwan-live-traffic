@@ -1,4 +1,4 @@
-import zlib from 'zlib';
+import { gunzipSync } from 'zlib';
 import { XMLParser } from 'fast-xml-parser';
 import type { Camera } from '@/types/camera';
 
@@ -17,13 +17,12 @@ interface RawCCTV {
 
 export async function fetchFreewayCameras(): Promise<Camera[]> {
   const res = await fetch(CCTV_INFO_URL, {
-    next: { revalidate: 300 },
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`Freeway fetch failed: ${res.status}`);
 
   const buf = Buffer.from(await res.arrayBuffer());
-  const xml = zlib.gunzipSync(buf).toString('utf-8');
+  const xml = gunzipSync(buf).toString('utf-8');
 
   const parser = new XMLParser({
     ignoreAttributes: false,
