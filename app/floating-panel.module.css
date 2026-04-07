@@ -1,0 +1,10 @@
+.floatingPanel {
+  position: absolute;
+  z-index: 40;
+  transition: all 0.3s ease;
+}
+
+.floatingPanel.dragging {
+  -webkit-user-select: none;
+  user-select: none;
+}

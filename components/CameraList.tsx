@@ -1,30 +1,36 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Camera } from '@/types/camera';
 import CameraCard from './CameraCard';
 
 const INITIAL_LOAD = 4;
 const INCREMENT = 12;
 
-interface Props {
-  cameras: Camera[];
-  query: string;
-  onSelect: (c: Camera) => void;
+interface CameraItem {
+  camera: Camera;
+  distance?: number;
 }
 
-export default function CameraList({ cameras, query, onSelect }: Props) {
+interface Props {
+  items: CameraItem[];
+  query: string;
+  onSelect: (c: Camera) => void;
+  selectedIds?: string[];
+}
+
+export default function CameraList({ items, query, onSelect, selectedIds }: Props) {
   const [displayCount, setDisplayCount] = useState(INITIAL_LOAD);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const filtered = cameras.filter((c) => {
+  const filtered = items.filter(({ camera }) => {
     if (!query) return true;
     const q = query.toLowerCase();
     return (
-      c.name.toLowerCase().includes(q) ||
-      c.id.toLowerCase().includes(q) ||
-      (c.road?.toLowerCase().includes(q) ?? false)
+      camera.name.toLowerCase().includes(q) ||
+      camera.id.toLowerCase().includes(q) ||
+      (camera.road?.toLowerCase().includes(q) ?? false)
     );
   });
 
@@ -65,8 +71,14 @@ export default function CameraList({ cameras, query, onSelect }: Props) {
     <div className="flex flex-col gap-4">
       <p className="text-xs text-gray-500">已載入 {visible.length} / {filtered.length} 台監視器</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-        {visible.map((c) => (
-          <CameraCard key={c.id} camera={c} onClick={onSelect} />
+        {visible.map((item) => (
+          <CameraCard
+            key={item.camera.id}
+            camera={item.camera}
+            distance={item.distance}
+            selected={selectedIds?.includes(item.camera.id)}
+            onClick={onSelect}
+          />
         ))}
       </div>
       

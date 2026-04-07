@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Camera } from '@/types/camera';
+import styles from './camera-modal.module.css';
 
 const TYPE_LABEL: Record<Camera['type'], string> = {
   freeway: '國道',
@@ -59,8 +60,7 @@ export default function CameraModal({ camera, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black/70 p-4"
-      style={{ zIndex: 99999 }}
+      className={styles.modal}
       onClick={onClose}
     >
       <div
@@ -81,6 +81,7 @@ export default function CameraModal({ camera, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
+            title="Close modal"
             className="shrink-0 ml-3 text-gray-400 hover:text-gray-600 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

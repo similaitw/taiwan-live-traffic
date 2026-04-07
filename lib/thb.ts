@@ -43,12 +43,12 @@ function mapTHB(raw: THBCamera, type: 'provincial' | 'county'): Camera | null {
     id;
   
   // THB uses 'html' field for stream URL, try multiple field names
-  let streamUrl = (raw.html as string) ?? 
-                  (raw.url as string) ?? 
-                  (raw.videoliveurl as string) ?? 
-                  (raw.VideoLiveUrl as string) ??
-                  (raw.liveurl as string) ?? 
-                  (raw.LiveUrl as string) ?? '';
+  const streamUrl = (raw.html as string) ?? 
+                    (raw.url as string) ?? 
+                    (raw.videoliveurl as string) ?? 
+                    (raw.VideoLiveUrl as string) ??
+                    (raw.liveurl as string) ?? 
+                    (raw.LiveUrl as string) ?? '';
   
   const snapshotUrl = (raw.snapshoturl as string) ?? 
                       (raw.snapshotUrl as string) ??

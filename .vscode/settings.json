@@ -1,0 +1,7 @@
+{
+  "[css]": {
+    "stylelint.enable": false
+  },
+  "css.lint.universalSelector": "ignore",
+  "css.lint.importante": "ignore"
+}

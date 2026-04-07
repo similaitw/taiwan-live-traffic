@@ -17,10 +17,12 @@ const TYPE_COLOR: Record<Camera['type'], string> = {
 
 interface Props {
   camera: Camera;
+  distance?: number;
+  selected?: boolean;
   onClick: (c: Camera) => void;
 }
 
-export default function CameraCard({ camera, onClick }: Props) {
+export default function CameraCard({ camera, distance, selected, onClick }: Props) {
   const [imgError, setImgError] = useState(false);
   const [imgLoading, setImgLoading] = useState(true);
   const sourceLabel = camera.snapshotUrl ? '抓圖來源' : '直播來源';
@@ -30,13 +32,18 @@ export default function CameraCard({ camera, onClick }: Props) {
 
   return (
     <div
-      className="rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg hover:border-blue-400 transition-all group bg-white"
+      className={`relative rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg hover:border-blue-400 transition-all group bg-white ${selected ? 'ring-2 ring-blue-500/50' : ''}`}
       onClick={() => onClick(camera)}
     >
       <div className="relative aspect-video bg-gray-100 overflow-hidden">
         <span className="absolute right-2 top-2 z-10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white rounded-full bg-black/70">
           {sourceLabel}
         </span>
+        {selected && (
+          <span className="absolute left-2 top-2 z-10 px-2 py-0.5 text-[10px] font-semibold text-white rounded-full bg-blue-600">
+            已勾選
+          </span>
+        )}
         {proxyUrl && !imgError ? (
           <>
             {imgLoading && (
@@ -83,6 +90,11 @@ export default function CameraCard({ camera, onClick }: Props) {
         </div>
         {camera.road && (
           <p className="text-xs text-gray-500 mt-1 truncate">{camera.road}</p>
+        )}
+        {distance !== undefined && distance !== Infinity && (
+          <p className="text-xs text-gray-500 mt-1 truncate">
+            距離 { (distance / 1000).toFixed(1) } 公里
+          </p>
         )}
       </div>
     </div>

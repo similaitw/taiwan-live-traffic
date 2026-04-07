@@ -34,13 +34,15 @@ function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * c;
 }
 
-function makeIcon(type: Camera['type']): L.DivIcon {
-  const color = COLORS[type];
+function makeIcon(type: Camera['type'], selected = false): L.DivIcon {
+  const color = selected ? '#2563eb' : COLORS[type];
+  const stroke = selected ? '#2563eb' : 'white';
+  const strokeWidth = selected ? 3 : 1.5;
   return L.divIcon({
     className: '',
     html: `<svg width="22" height="30" viewBox="0 0 22 30" xmlns="http://www.w3.org/2000/svg">
       <path d="M11 0C4.925 0 0 4.925 0 11c0 7.5 11 19 11 19S22 18.5 22 11C22 4.925 17.075 0 11 0z"
-        fill="${color}" stroke="white" stroke-width="1.5"/>
+        fill="${color}" stroke="${stroke}" stroke-width="${strokeWidth}"/>
       <circle cx="11" cy="11" r="4.5" fill="white" opacity="0.9"/>
     </svg>`,
     iconSize: [22, 30],
@@ -54,14 +56,18 @@ interface Props {
   cameras: Camera[];
   query: string;
   onSelect: (c: Camera) => void;
+  onToggleSelect: (c: Camera) => void;
+  selectedIds?: string[];
   userLocation?: { lat: number; lng: number } | null;
+  rangeKm?: number | null;
 }
 
-export default function MapInner({ cameras, query, onSelect, userLocation }: Props) {
+export default function MapInner({ cameras, query, onSelect, onToggleSelect, selectedIds, userLocation, rangeKm }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
+  const rangeCircleRef = useRef<L.Circle | null>(null);
 
   // Init map
   useEffect(() => {
@@ -113,6 +119,31 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
     mapRef.current.setView([userLocation.lat, userLocation.lng], 12, { animate: true });
   }, [userLocation]);
 
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (!userLocation || !rangeKm) {
+      if (rangeCircleRef.current) {
+        mapRef.current.removeLayer(rangeCircleRef.current);
+        rangeCircleRef.current = null;
+      }
+      return;
+    }
+
+    if (rangeCircleRef.current) {
+      rangeCircleRef.current.setLatLng([userLocation.lat, userLocation.lng]);
+      rangeCircleRef.current.setRadius(rangeKm * 1000);
+    } else {
+      rangeCircleRef.current = L.circle([userLocation.lat, userLocation.lng], {
+        radius: rangeKm * 1000,
+        color: '#3b82f6',
+        fillColor: '#3b82f6',
+        fillOpacity: 0.08,
+        weight: 2,
+        dashArray: '6',
+      }).addTo(mapRef.current);
+    }
+  }, [userLocation, rangeKm]);
+
   // Render markers when cameras or query changes
   useEffect(() => {
     if (!mapRef.current || !layerRef.current) return;
@@ -145,7 +176,8 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
       const shown = candidates.slice(0, MAX_MARKERS);
 
       shown.forEach(({ camera }) => {
-        const marker = L.marker([camera.lat, camera.lng], { icon: makeIcon(camera.type), zIndexOffset: 1000 });
+        const selected = selectedIds?.includes(camera.id) ?? false;
+        const marker = L.marker([camera.lat, camera.lng], { icon: makeIcon(camera.type, selected), zIndexOffset: 1000 });
 
         // 預覽小窗（滑鼠移入時顯示）
         const previewContent = `
@@ -162,8 +194,9 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
               <div style="color:#6b7280; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; line-height:1.2;">
                 📍 ${camera.road ?? '無道路資訊'}
               </div>
-              <div style="padding-top:8px; border-top:1px solid #f3f4f6; color:#2563eb; font-size:11px; font-weight:600; text-align:center; padding-bottom:2px; cursor:pointer; transition: color 0.2s;">
-                👉 點擊查看即時畫面
+              <div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px solid #f3f4f6; font-size:11px; font-weight:600; line-height:1.2;">
+                <span style="color:${selected ? '#1d4ed8' : '#6b7280'};">${selected ? '已勾選' : 'Shift+Click 勾選'}</span>
+                <span style="color:#2563eb; cursor:pointer;">👉 點擊查看即時畫面</span>
               </div>
             </div>
           </div>
@@ -180,12 +213,17 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
           mapRef.current?.closePopup(popup);
         });
 
-        marker.on('click', () => {
+        marker.on('click', (event: L.LeafletMouseEvent) => {
+          if (event.originalEvent?.shiftKey) {
+            onToggleSelect(camera);
+            return;
+          }
+
           // 平滑移動地圖到此 marker，同時稍微放大
           const currentZoom = mapRef.current!.getZoom();
-          mapRef.current!.setView(marker.getLatLng(), Math.max(currentZoom, 13), { 
+          mapRef.current!.setView(marker.getLatLng(), Math.max(currentZoom, 13), {
             animate: true,
-            duration: 0.8 
+            duration: 0.8,
           });
           
           // 關閉預覽並打開主窗
@@ -211,7 +249,7 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
     return () => {
       mapRef.current?.off('moveend', handleMapChange);
     };
-  }, [cameras, query, onSelect]);
+  }, [cameras, query, onSelect, onToggleSelect, selectedIds]);
 
   return (
     <>

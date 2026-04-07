@@ -6,6 +6,7 @@ import SearchBar from '@/components/SearchBar';
 import CameraList from '@/components/CameraList';
 import CameraModal from '@/components/CameraModal';
 import Map from '@/components/Map';
+import styles from './floating-panel.module.css';
 
 type View = 'map' | 'list';
 
@@ -15,6 +16,15 @@ const TYPE_LABEL: Record<Camera['type'], string> = {
   county: '縣市',
 };
 
+const RANGE_OPTIONS = ['all', 5, 10, 20, 50] as const;
+const RANGE_LABEL: Record<typeof RANGE_OPTIONS[number], string> = {
+  all: '全部',
+  5: '5 公里',
+  10: '10 公里',
+  20: '20 公里',
+  50: '50 公里',
+};
+
 export default function HomePage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,9 +32,49 @@ export default function HomePage() {
   const [query, setQuery] = useState('');
   const [view, setView] = useState<View>('map');
   const [selected, setSelected] = useState<Camera | null>(null);
+  const [selectedCameraIds, setSelectedCameraIds] = useState<string[]>([]);
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
+  const [isPanelExpanded, setIsPanelExpanded] = useState(true);
+  const [panelPosition, setPanelPosition] = useState({ x: 16, y: 16 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const panelRef = useCallback((node: HTMLDivElement | null) => {
+    if (node && isDragging) {
+      const handleMouseMove = (e: MouseEvent) => {
+        const maxX = Math.max(0, window.innerWidth - (node.offsetWidth || 400));
+        const maxY = Math.max(0, window.innerHeight - (node.offsetHeight || 200));
+        const newX = Math.max(0, Math.min(maxX, e.clientX - dragOffset.x));
+        const newY = Math.max(0, Math.min(maxY, e.clientY - dragOffset.y));
+        setPanelPosition({ x: newX, y: newY });
+      };
+
+      const handleMouseUp = () => {
+        setIsDragging(false);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
+
+  const handlePanelMouseDown = (e: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => {
+    const node = e.currentTarget;
+    if (!node) return;
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - panelPosition.x,
+      y: e.clientY - panelPosition.y,
+    });
+  };
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sortByNearest, setSortByNearest] = useState(false);
+  const [rangeFilter, setRangeFilter] = useState<'all' | 5 | 10 | 20 | 50>('all');
 
   const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
     const toRad = (v: number) => (v * Math.PI) / 180;
@@ -90,6 +140,25 @@ export default function HomePage() {
   }, []);
 
   const handleSelect = useCallback((c: Camera) => setSelected(c), []);
+  const handleToggleSelected = useCallback((camera: Camera) => {
+    setSelectedCameraIds((ids) =>
+      ids.includes(camera.id)
+        ? ids.filter((id) => id !== camera.id)
+        : [...ids, camera.id]
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!userLocation && rangeFilter !== 'all') {
+      setRangeFilter('all');
+    }
+  }, [userLocation, rangeFilter]);
+
+  useEffect(() => {
+    if (showOnlySelected && selectedCameraIds.length === 0) {
+      setShowOnlySelected(false);
+    }
+  }, [showOnlySelected, selectedCameraIds.length]);
 
   const filtered = cameras
     .filter((c) => {
@@ -103,10 +172,12 @@ export default function HomePage() {
       );
     })
     .map((c) => {
-      if (!userLocation) return { camera: c, distance: Infinity };
+      const distance = userLocation
+        ? getDistance(userLocation.lat, userLocation.lng, c.lat, c.lng)
+        : Infinity;
       return {
         camera: c,
-        distance: getDistance(userLocation.lat, userLocation.lng, c.lat, c.lng),
+        distance,
       };
     });
 
@@ -115,7 +186,15 @@ export default function HomePage() {
       ? [...filtered].sort((a, b) => a.distance - b.distance)
       : filtered;
 
-  const filteredCameras = sorted.map((item) => item.camera);
+  const selectedFiltered = showOnlySelected
+    ? sorted.filter((item) => selectedCameraIds.includes(item.camera.id))
+    : sorted;
+
+  const rangeFiltered = selectedFiltered.filter((item) =>
+    rangeFilter === 'all' || item.distance <= rangeFilter * 1000
+  );
+
+  const filteredCameras = rangeFiltered.map((item) => item.camera);
 
   const counts = {
     all: cameras.length,
@@ -129,7 +208,13 @@ export default function HomePage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shrink-0 z-30">
         <div className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div
+            className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center cursor-pointer"
+            role="button"
+            title={isPanelExpanded ? '收起篩選面板' : '展開篩選面板'}
+            aria-pressed={isPanelExpanded}
+            onClick={() => setIsPanelExpanded((v) => !v)}
+          >
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M3 8a2 2 0
@@ -159,57 +244,141 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Filter bar */}
-      <div className="bg-white border-b border-gray-100 px-4 py-2 flex flex-wrap items-center gap-2 shrink-0 overflow-x-auto">
-        {(['all', 'freeway', 'provincial', 'county'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTypeFilter(t)}
-            className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              typeFilter === t
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {t === 'all' ? `全部 (${counts.all})` : `${TYPE_LABEL[t]} (${counts[t]})`}
-          </button>
-        ))}
-
-        <button
-          onClick={locateMe}
-          className="shrink-0 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
-        >
-          定位我
-        </button>
-
-        <button
-          onClick={() => setSortByNearest((v) => !v)}
-          disabled={!userLocation}
-          className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-            sortByNearest
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          } ${!userLocation ? 'opacity-40 cursor-not-allowed' : ''}`}
-        >
-          離我最近
-        </button>
-
-        {userLocation && (
-          <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">
-            目前位置：{userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
-          </span>
-        )}
-
-        {loading && (
-          <span className="text-xs text-gray-400 ml-2">載入中…</span>
-        )}
-        {error && (
-          <span className="text-xs text-red-500 ml-2">錯誤：{error}</span>
-        )}
-      </div>
-
       {/* Main content */}
-      <main className="flex-1 overflow-hidden">
+      <main className="relative flex-1 overflow-hidden">
+        {/* Floating Control Panel */}
+        <div
+          ref={panelRef}
+          className={`${styles.floatingPanel} ${isDragging ? styles.dragging : ''}`}
+          style={{
+            left: `${panelPosition.x}px`,
+            top: `${panelPosition.y}px`,
+          }}
+        >
+          {isPanelExpanded && (
+            <div className="w-[calc(100vw-2rem)] max-w-4xl bg-white/95 backdrop-blur-xl border border-slate-200 shadow-xl rounded-3xl p-4 flex flex-col gap-3">
+              {/* Drag handle */}
+              <div
+                onMouseDown={handlePanelMouseDown}
+                className="w-full h-2 -m-4 mb-2 cursor-grab active:cursor-grabbing rounded-t-3xl hover:bg-slate-100/30"
+              />
+
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-slate-600">篩選聊天</h3>
+                <button
+                  onClick={() => setIsPanelExpanded(false)}
+                  title="Close panel"
+                  className="shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    {(['all', 'freeway', 'provincial', 'county'] as const).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setTypeFilter(t)}
+                        className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                          typeFilter === t
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {t === 'all' ? `全部 (${counts.all})` : `${TYPE_LABEL[t]} (${counts[t]})`}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={locateMe}
+                      className="shrink-0 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                    >
+                      定位我
+                    </button>
+
+                    <button
+                      onClick={() => setSortByNearest((v) => !v)}
+                      disabled={!userLocation}
+                      className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        sortByNearest
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      } ${!userLocation ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      離我最近
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 items-center">
+                  {RANGE_OPTIONS.map((range) => (
+                    <button
+                      key={range}
+                      onClick={() => setRangeFilter(range)}
+                      disabled={range !== 'all' && !userLocation}
+                      className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        rangeFilter === range
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      } ${range !== 'all' && !userLocation ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      {RANGE_LABEL[range]}
+                    </button>
+                  ))}
+
+                  <button
+                    onClick={() => setShowOnlySelected((v) => !v)}
+                    disabled={selectedCameraIds.length === 0}
+                    className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      showOnlySelected
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    } ${selectedCameraIds.length === 0 ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    {showOnlySelected ? '只顯示勾選' : '顯示勾選'}
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedCameraIds([])}
+                    disabled={selectedCameraIds.length === 0}
+                    className="shrink-0 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    清除勾選
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 items-center text-xs text-slate-500">
+                  {selectedCameraIds.length > 0 ? (
+                    <span>已勾選 {selectedCameraIds.length} 台。按住 Shift 點選地圖標記以切換勾選。</span>
+                  ) : (
+                    <span>使用 Shift+點選地圖標記進行勾選，再啟用「只顯示勾選」。</span>
+                  )}
+
+                  {userLocation && (
+                    <span className="px-2 py-1 bg-gray-100 rounded text-gray-500">
+                      目前位置：{userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+                    </span>
+                  )}
+
+                  {rangeFilter !== 'all' && userLocation && (
+                    <span className="px-2 py-1 bg-blue-50 rounded text-blue-600">
+                      顯示 {RANGE_LABEL[rangeFilter]} 內監視器
+                    </span>
+                  )}
+
+                  {loading && <span className="text-gray-400">載入中…</span>}
+                  {error && <span className="text-red-500">錯誤：{error}</span>}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-3 text-gray-400">
@@ -227,12 +396,20 @@ export default function HomePage() {
               cameras={filteredCameras}
               query={query}
               onSelect={handleSelect}
+              onToggleSelect={handleToggleSelected}
+              selectedIds={selectedCameraIds}
               userLocation={userLocation}
+              rangeKm={rangeFilter === 'all' ? null : rangeFilter}
             />
           </div>
         ) : (
           <div className="h-full overflow-y-auto p-4">
-            <CameraList cameras={filteredCameras} query={query} onSelect={handleSelect} />
+            <CameraList
+              items={rangeFiltered}
+              query={query}
+              onSelect={handleSelect}
+              selectedIds={selectedCameraIds}
+            />
           </div>
         )}
       </main>
