@@ -15,6 +15,12 @@ const TYPE_LABEL: Record<Camera['type'], string> = {
   county: '縣市',
 };
 
+const TYPE_ICON: Record<Camera['type'], string> = {
+  freeway: '🛣️',
+  provincial: '🏔️',
+  county: '🏘️',
+};
+
 export default function HomePage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,12 +34,11 @@ export default function HomePage() {
 
   const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
     const toRad = (v: number) => (v * Math.PI) / 180;
-    const R = 6371e3; // meters
+    const R = 6371e3;
     const φ1 = toRad(lat1);
     const φ2 = toRad(lat2);
     const Δφ = toRad(lat2 - lat1);
     const Δλ = toRad(lng2 - lng1);
-
     const a =
       Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
       Math.cos(φ1) * Math.cos(φ2) *
@@ -72,7 +77,6 @@ export default function HomePage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
 
-    // Auto-locate on mount
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -81,9 +85,7 @@ export default function HomePage() {
             lng: position.coords.longitude,
           });
         },
-        () => {
-          // 定位失敗時靜默，不顯示錯誤
-        },
+        () => {},
         { enableHighAccuracy: true, timeout: 10000 }
       );
     }
@@ -125,100 +127,160 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden relative noise" style={{ background: 'var(--bg-primary)' }}>
+      {/* Ambient glow effects */}
+      <div className="pointer-events-none absolute top-0 left-1/4 w-96 h-96 rounded-full opacity-20"
+        style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)', filter: 'blur(60px)' }} />
+      <div className="pointer-events-none absolute top-0 right-1/4 w-72 h-72 rounded-full opacity-15"
+        style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)', filter: 'blur(50px)' }} />
+
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shrink-0 z-30">
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M3 8a2 2 0
-                  012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
-            </svg>
+      <header className="relative z-30 shrink-0 glass" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+        <div className="px-4 py-3 flex items-center gap-3">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="relative w-9 h-9 rounded-lg flex items-center justify-center animate-pulse-glow"
+              style={{ background: 'linear-gradient(135deg, var(--accent-freeway), #6366f1)' }}>
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M3 8a2 2 0
+                    012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+              </svg>
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="font-black text-sm tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                全台監視器即時查詢
+              </h1>
+              <p className="text-[10px] font-mono tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
+                LIVE TRAFFIC CAM
+              </p>
+            </div>
           </div>
-          <h1 className="font-bold text-gray-900 text-sm sm:text-base whitespace-nowrap">
-            全台監視器即時查詢
-          </h1>
-        </div>
 
-        <SearchBar value={query} onChange={setQuery} />
+          <SearchBar value={query} onChange={setQuery} />
 
-        {/* View toggle */}
-        <div className="flex shrink-0 rounded-lg border border-gray-300 overflow-hidden">
-          {(['map', 'list'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                view === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {v === 'map' ? '地圖' : '清單'}
-            </button>
-          ))}
+          {/* View toggle */}
+          <div className="flex shrink-0 rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
+            {(['map', 'list'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className="px-3.5 py-1.5 text-xs font-bold tracking-wide transition-all duration-200"
+                style={{
+                  background: view === v ? 'var(--accent-freeway)' : 'transparent',
+                  color: view === v ? '#fff' : 'var(--text-secondary)',
+                  boxShadow: view === v ? '0 0 12px rgba(59,130,246,0.3)' : 'none',
+                }}
+              >
+                {v === 'map' ? '地圖' : '清單'}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
       {/* Filter bar */}
-      <div className="bg-white border-b border-gray-100 px-4 py-2 flex flex-wrap items-center gap-2 shrink-0 overflow-x-auto">
-        {(['all', 'freeway', 'provincial', 'county'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTypeFilter(t)}
-            className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              typeFilter === t
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {t === 'all' ? `全部 (${counts.all})` : `${TYPE_LABEL[t]} (${counts[t]})`}
-          </button>
-        ))}
+      <div className="relative z-20 shrink-0 px-4 py-2.5 flex flex-wrap items-center gap-2 overflow-x-auto"
+        style={{ background: 'rgba(17, 24, 39, 0.6)', borderBottom: '1px solid var(--border-subtle)' }}>
+        {(['all', 'freeway', 'provincial', 'county'] as const).map((t, i) => {
+          const active = typeFilter === t;
+          const colorMap: Record<string, string> = {
+            all: 'var(--accent-freeway)',
+            freeway: 'var(--accent-freeway)',
+            provincial: 'var(--accent-provincial)',
+            county: 'var(--accent-county)',
+          };
+          const color = colorMap[t];
+          return (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all duration-200"
+              style={{
+                animationDelay: `${i * 50}ms`,
+                background: active ? color : 'rgba(255,255,255,0.04)',
+                color: active ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${active ? color : 'var(--border-subtle)'}`,
+                boxShadow: active ? `0 0 16px ${color}33` : 'none',
+              }}
+            >
+              {t === 'all'
+                ? `全部 ${counts.all}`
+                : `${TYPE_ICON[t]} ${TYPE_LABEL[t]} ${counts[t]}`}
+            </button>
+          );
+        })}
+
+        <div className="w-px h-5 mx-1" style={{ background: 'var(--border-subtle)' }} />
 
         <button
           onClick={locateMe}
-          className="shrink-0 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+          className="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all duration-200"
+          style={{
+            background: 'rgba(16, 185, 129, 0.1)',
+            color: 'var(--accent-provincial)',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+          }}
         >
-          定位我
+          <span className="inline-flex items-center gap-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+            </svg>
+            定位
+          </span>
         </button>
 
         <button
           onClick={() => setSortByNearest((v) => !v)}
           disabled={!userLocation}
-          className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-            sortByNearest
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          } ${!userLocation ? 'opacity-40 cursor-not-allowed' : ''}`}
+          className="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all duration-200"
+          style={{
+            background: sortByNearest ? 'var(--accent-freeway)' : 'rgba(255,255,255,0.04)',
+            color: sortByNearest ? '#fff' : 'var(--text-secondary)',
+            border: `1px solid ${sortByNearest ? 'var(--accent-freeway)' : 'var(--border-subtle)'}`,
+            opacity: userLocation ? 1 : 0.3,
+            cursor: userLocation ? 'pointer' : 'not-allowed',
+          }}
         >
           離我最近
         </button>
 
         {userLocation && (
-          <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">
-            目前位置：{userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+          <span className="text-[10px] font-mono px-2 py-1 rounded" style={{ color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)' }}>
+            {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
           </span>
         )}
 
         {loading && (
-          <span className="text-xs text-gray-400 ml-2">載入中…</span>
+          <span className="text-xs ml-2 animate-pulse" style={{ color: 'var(--accent-freeway)' }}>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: 'var(--accent-freeway)' }} />
+              載入中…
+            </span>
+          </span>
         )}
         {error && (
-          <span className="text-xs text-red-500 ml-2">錯誤：{error}</span>
+          <span className="text-xs ml-2" style={{ color: 'var(--accent-pink)' }}>
+            {error}
+          </span>
         )}
       </div>
 
       {/* Main content */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden relative">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-3 text-gray-400">
-              <svg className="w-10 h-10 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <p className="text-sm">正在載入監視器資料…</p>
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: 'var(--accent-freeway)' }} />
+                <div className="absolute inset-2 rounded-full animate-spin"
+                  style={{ border: '2px solid var(--border-subtle)', borderTopColor: 'var(--accent-freeway)' }} />
+                <div className="absolute inset-4 rounded-full"
+                  style={{ background: 'var(--accent-freeway)', opacity: 0.2 }} />
+              </div>
+              <p className="text-sm font-mono tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                LOADING CAMERAS...
+              </p>
             </div>
           </div>
         ) : view === 'map' ? (

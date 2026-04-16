@@ -5,7 +5,6 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Camera } from '@/types/camera';
 
-// Fix default marker icon paths broken by webpack
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -15,8 +14,8 @@ L.Icon.Default.mergeOptions({
 
 const COLORS: Record<Camera['type'], string> = {
   freeway: '#3b82f6',
-  provincial: '#22c55e',
-  county: '#f97316',
+  provincial: '#10b981',
+  county: '#f59e0b',
 };
 
 function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -38,15 +37,23 @@ function makeIcon(type: Camera['type']): L.DivIcon {
   const color = COLORS[type];
   return L.divIcon({
     className: '',
-    html: `<svg width="22" height="30" viewBox="0 0 22 30" xmlns="http://www.w3.org/2000/svg">
-      <path d="M11 0C4.925 0 0 4.925 0 11c0 7.5 11 19 11 19S22 18.5 22 11C22 4.925 17.075 0 11 0z"
-        fill="${color}" stroke="white" stroke-width="1.5"/>
-      <circle cx="11" cy="11" r="4.5" fill="white" opacity="0.9"/>
+    html: `<svg width="24" height="32" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow-${type}" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feFlood flood-color="${color}" flood-opacity="0.4" result="color"/>
+          <feComposite in="color" in2="blur" operator="in" result="glow"/>
+          <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 8 12 20 12 20S24 20 24 12C24 5.373 18.627 0 12 0z"
+        fill="${color}" stroke="rgba(255,255,255,0.3)" stroke-width="1" filter="url(#glow-${type})"/>
+      <circle cx="12" cy="12" r="4" fill="rgba(255,255,255,0.9)"/>
     </svg>`,
-    iconSize: [22, 30],
-    iconAnchor: [11, 30],
-    popupAnchor: [0, -32],
-    tooltipAnchor: [12, -15],
+    iconSize: [24, 32],
+    iconAnchor: [12, 32],
+    popupAnchor: [0, -34],
+    tooltipAnchor: [12, -16],
   });
 }
 
@@ -67,13 +74,14 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     mapRef.current = L.map(containerRef.current).setView([23.9, 121.0], 8);
-    
-    // Use OpenStreetMap tiles (free, no limit)
+
+    // Dark-themed CartoDB tiles
     L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
       {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
+        subdomains: 'abcd',
       }
     ).addTo(mapRef.current);
     layerRef.current = L.layerGroup().addTo(mapRef.current);
@@ -84,24 +92,23 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
     };
   }, []);
 
-  // Auto-zoom 到用戶位置
+  // Auto-zoom to user location
   useEffect(() => {
     if (!mapRef.current || !userLocation) return;
 
-    // 移除舊的用戶 marker
     if (userMarkerRef.current) {
       mapRef.current.removeLayer(userMarkerRef.current);
     }
 
-    // 添加新的用戶 marker（藍色圓點 + 準確度圓圈）
     const userIcon = L.divIcon({
       className: '',
-      html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="8" fill="#3b82f6" stroke="white" stroke-width="2"/>
-        <circle cx="12" cy="12" r="3" fill="white"/>
+      html: `<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="14" cy="14" r="12" fill="rgba(59,130,246,0.15)" stroke="rgba(59,130,246,0.3)" stroke-width="1"/>
+        <circle cx="14" cy="14" r="6" fill="#3b82f6" stroke="rgba(255,255,255,0.6)" stroke-width="2"/>
+        <circle cx="14" cy="14" r="2" fill="white"/>
       </svg>`,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
     });
 
     userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], {
@@ -109,14 +116,13 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
       zIndexOffset: 2000,
     }).addTo(mapRef.current);
 
-    // 自動 zoom 到用戶位置（level 12）
     mapRef.current.setView([userLocation.lat, userLocation.lng], 12, { animate: true });
   }, [userLocation]);
 
-  // Render markers when cameras or query changes
+  // Render markers
   useEffect(() => {
     if (!mapRef.current || !layerRef.current) return;
-    
+
     const renderMarkers = () => {
       layerRef.current!.clearLayers();
 
@@ -133,43 +139,41 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
       const center = mapRef.current!.getCenter();
       const candidates = filtered
         .map((camera) => {
-          // 永遠以畫面中央作為定位基準
           const distance = getDistance(center.lat, center.lng, camera.lat, camera.lng);
           return { camera, distance };
         })
         .sort((a, b) => a.distance - b.distance);
 
-      // Dynamic marker limit based on zoom
       const zoom = mapRef.current!.getZoom();
       const MAX_MARKERS = zoom > 10 ? 200 : zoom > 8 ? 100 : 50;
       const shown = candidates.slice(0, MAX_MARKERS);
 
       shown.forEach(({ camera }) => {
         const marker = L.marker([camera.lat, camera.lng], { icon: makeIcon(camera.type), zIndexOffset: 1000 });
+        const color = COLORS[camera.type];
 
-        // 預覽小窗（滑鼠移入時顯示）
         const previewContent = `
-          <div style="width:190px; user-select:none;">
-            <div style="position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#1a1a1a; margin-bottom:8px; border-radius:6px; box-shadow: inset 0 0 8px rgba(0,0,0,0.3);">
-              <img src="/api/proxy/image?url=${encodeURIComponent(camera.streamUrl)}" alt="${camera.name}" 
-                style="width:100%; height:100%; object-fit:cover; transition: transform 0.3s ease;" 
+          <div style="width:200px; font-family:'Noto Sans TC',sans-serif;">
+            <div style="position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#0a0e1a; margin-bottom:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+              <img src="/api/proxy/snapshot?url=${encodeURIComponent(camera.snapshotUrl ?? camera.streamUrl)}" alt="${camera.name}"
+                style="width:100%; height:100%; object-fit:cover;"
                 onerror="this.style.display='none'"/>
             </div>
-            <div style="padding: 0 2px;">
-              <div style="font-weight:700; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:13px; line-height:1.3; margin-bottom:4px;">
+            <div style="padding:0 2px;">
+              <div style="font-weight:700; color:#e8ecf4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; line-height:1.4; margin-bottom:4px;">
                 ${camera.name}
               </div>
-              <div style="color:#6b7280; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; line-height:1.2;">
-                📍 ${camera.road ?? '無道路資訊'}
+              <div style="color:#4b5563; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; font-family:'JetBrains Mono',monospace;">
+                ${camera.road ?? '—'}
               </div>
-              <div style="padding-top:8px; border-top:1px solid #f3f4f6; color:#2563eb; font-size:11px; font-weight:600; text-align:center; padding-bottom:2px; cursor:pointer; transition: color 0.2s;">
-                👉 點擊查看即時畫面
+              <div style="padding-top:8px; border-top:1px solid rgba(255,255,255,0.06); color:${color}; font-size:10px; font-weight:700; text-align:center; letter-spacing:0.05em;">
+                CLICK TO VIEW LIVE
               </div>
             </div>
           </div>
         `;
 
-        const popup = L.popup({ maxWidth: 200, className: 'leaflet-camera-preview' })
+        const popup = L.popup({ maxWidth: 220, className: 'leaflet-camera-preview' })
           .setContent(previewContent);
 
         marker.on('mouseover', () => {
@@ -181,14 +185,11 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
         });
 
         marker.on('click', () => {
-          // 平滑移動地圖到此 marker，同時稍微放大
           const currentZoom = mapRef.current!.getZoom();
-          mapRef.current!.setView(marker.getLatLng(), Math.max(currentZoom, 13), { 
+          mapRef.current!.setView(marker.getLatLng(), Math.max(currentZoom, 13), {
             animate: true,
-            duration: 0.8 
+            duration: 0.8
           });
-          
-          // 關閉預覽並打開主窗
           mapRef.current?.closePopup(popup);
           onSelect(camera);
         });
@@ -196,15 +197,13 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
         marker.addTo(layerRef.current!);
       });
 
-      // 不顯示通知 popup，避免重複出現
       if (candidates.length > MAX_MARKERS) {
-        console.log(`顯示 ${MAX_MARKERS} 個 marker（共 ${candidates.length} 個），請用搜尋或縮放地圖以檢視其他資料`);
+        console.log(`顯示 ${MAX_MARKERS} 個 marker（共 ${candidates.length} 個）`);
       }
     };
 
     renderMarkers();
-    
-    // 移動或縮放地圖時重新渲染 marker（以畫面中央定位）
+
     const handleMapChange = () => renderMarkers();
     mapRef.current.on('moveend', handleMapChange);
 
@@ -213,45 +212,5 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
     };
   }, [cameras, query, onSelect]);
 
-  return (
-    <>
-      <style>{`
-        .leaflet-pane { z-index: 400 !important; }
-        .leaflet-marker-pane { z-index: 500 !important; }
-        .leaflet-popup-pane { z-index: 1 !important; }
-        .leaflet-tooltip-pane { z-index: 1 !important; }
-        
-        .leaflet-camera-preview .leaflet-popup-content-wrapper {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-          padding: 8px !important;
-          animation: slideUp 0.2s ease-out;
-        }
-        
-        .leaflet-camera-preview .leaflet-popup-content {
-          margin: 0;
-          padding: 0;
-          font-family: inherit;
-        }
-        
-        .leaflet-camera-preview .leaflet-popup-tip-container {
-          display: none;
-        }
-        
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(4px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
-      <div ref={containerRef} className="w-full h-full" />
-    </>
-  );
+  return <div ref={containerRef} className="w-full h-full" />;
 }
