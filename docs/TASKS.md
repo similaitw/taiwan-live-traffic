@@ -6,25 +6,34 @@
 
 ## Current task
 
-### M10.2 — Mobile layer-panel polish / responsive validation
+### M10.3 — Layer preferences persistence
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 行動版圖層按鈕納入 `safe-area-inset-bottom`，避免瀏海／手勢列與底部地圖清單切換遮擋。
-- [ ] 面板高度改以 dynamic viewport 限制，短螢幕仍可完整捲動。
-- [ ] Escape 可收合面板；面板使用適當 region / aria label。
-- [ ] 保持 ≥44px 的主要觸控目標，select 與 toggle 在窄螢幕不溢出。
-- [ ] 375 / 768 / 1280 layout 以程式碼與可用執行環境檢查；若瀏覽器環境不可用需明確記錄，不得宣稱已做視覺驗證。
-- [ ] 不改資料來源、圖層語意或 API。
+- [ ] 以 localStorage 記住雷達、雨量、CMS、即時路況、交通事件的顯示開關。
+- [ ] 記住 rainfall / CMS / flow / event filter，但不記動態 CMS road 選項，避免資料來源變動造成空畫面。
+- [ ] 儲存 key 使用版本化命名；資料損壞或舊格式時安全忽略並採預設值。
+- [ ] 首次 hydration 完成前不得用預設值覆蓋既有偏好。
+- [ ] TDX/CMS 暫時 unavailable 時不得清掉已儲存偏好，日後資料源恢復仍沿用。
+- [ ] 不影響 Camera 收藏／最近觀看的既有 localStorage。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M10.3 — Layer preferences persistence。
+完成後 M10 圖層控制階段結案。
 
 ---
 
 ## 已完成任務
+
+### M10.2 — Mobile layer-panel polish / responsive validation（已完成）
+- [x] 行動版加入 safe-area bottom offset。
+- [x] 面板使用 dynamic viewport 高度限制與 overscroll containment。
+- [x] Escape 可收合，panel 有 region / aria label。
+- [x] 主要 toggle / select / close button 採 44px 級觸控目標；超窄螢幕 CMS filters 改單欄。
+- [x] 375 / 768 / 1280 響應式規則完成程式碼檢查。
+- [x] 瀏覽器視覺驗證未宣稱完成：執行環境有 Chromium，但容器無法解析 GitHub DNS；Vercel connector 也未回傳可用 team/project。
+- [x] GitHub Actions run `34709117895` 成功。
 
 ### M10.1 — Unified map layer controls（已完成）
 - [x] 新增 `MapLayerControls`，多排浮動控制收成單一圖層入口。
@@ -106,8 +115,8 @@
 
 ### M10 — 圖層控制與行動版整理
 - [x] M10.1 Unified map layer controls
-- [ ] M10.2 Mobile layer-panel polish / responsive validation — **ChatGPT**
-- [ ] M10.3 Layer preferences persistence
+- [x] M10.2 Mobile layer-panel polish / responsive validation
+- [ ] M10.3 Layer preferences persistence — **ChatGPT**
 
 ---
 
