@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Camera } from '@/types/camera';
 import type { TrafficEvent } from '@/types/traffic-event';
+import type { TrafficFlowMapSegment } from '@/types/traffic-flow';
 import { getDistance } from '@/lib/geo';
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
@@ -44,6 +45,11 @@ interface RenderedMarker {
   signature: string;
 }
 
+interface RenderedFlow {
+  polyline: L.Polyline;
+  signature: string;
+}
+
 interface NearestCamera {
   camera: Camera;
   distance: number;
@@ -58,7 +64,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function formatEventTime(value?: string): string | undefined {
+function formatTime(value?: string): string | undefined {
   if (!value) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -74,6 +80,31 @@ function formatDistance(distance: number): string {
   return distance < 1000
     ? `${Math.round(distance)} m`
     : `${(distance / 1000).toFixed(1)} km`;
+}
+
+function formatTravelTime(seconds?: number): string | undefined {
+  if (seconds === undefined || !Number.isFinite(seconds)) return undefined;
+  if (seconds < 60) return `${Math.round(seconds)} 秒`;
+  return `${(seconds / 60).toFixed(seconds >= 600 ? 0 : 1)} 分`;
+}
+
+function congestionColor(level?: number): string {
+  if (level === undefined || level === 0 || level === -99) return '#64748b';
+  if (level === 1) return '#22c55e';
+  if (level === 2) return '#eab308';
+  if (level === 3) return '#f97316';
+  if (level === 4) return '#ef4444';
+  return '#991b1b';
+}
+
+function congestionLabel(level?: number): string {
+  if (level === -99) return '資料異常';
+  if (level === undefined || level === 0) return '未知';
+  if (level === 1) return '順暢';
+  if (level === 2) return '車多';
+  if (level === 3) return '壅塞';
+  if (level === 4) return '嚴重壅塞';
+  return '極度壅塞';
 }
 
 function makeIcon(type: Camera['type']): L.DivIcon {
@@ -96,7 +127,6 @@ function makeIcon(type: Camera['type']): L.DivIcon {
     iconSize: [24, 32],
     iconAnchor: [12, 32],
     popupAnchor: [0, -34],
-    tooltipAnchor: [12, -16],
   });
 }
 
@@ -104,21 +134,7 @@ function makeClusterIcon(count: number): L.DivIcon {
   const size = count >= 100 ? 52 : count >= 25 ? 46 : 40;
   return L.divIcon({
     className: '',
-    html: `<div style="
-      width:${size}px;
-      height:${size}px;
-      border-radius:9999px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:#fff;
-      font-family:'JetBrains Mono',monospace;
-      font-weight:800;
-      font-size:${count >= 100 ? 11 : 12}px;
-      background:linear-gradient(135deg,rgba(59,130,246,0.96),rgba(99,102,241,0.96));
-      border:2px solid rgba(255,255,255,0.65);
-      box-shadow:0 0 0 6px rgba(59,130,246,0.14),0 8px 24px rgba(0,0,0,0.42);
-    ">${count}</div>`,
+    html: `<div style="width:${size}px;height:${size}px;border-radius:9999px;display:flex;align-items:center;justify-content:center;color:#fff;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:${count >= 100 ? 11 : 12}px;background:linear-gradient(135deg,rgba(59,130,246,.96),rgba(99,102,241,.96));border:2px solid rgba(255,255,255,.65);box-shadow:0 0 0 6px rgba(59,130,246,.14),0 8px 24px rgba(0,0,0,.42)">${count}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -129,21 +145,7 @@ function makeEventIcon(severity: TrafficEvent['severity']): L.DivIcon {
   const size = severity === 'serious' ? 34 : 30;
   return L.divIcon({
     className: '',
-    html: `<div style="
-      width:${size}px;
-      height:${size}px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      transform:rotate(45deg);
-      border-radius:8px;
-      color:#fff;
-      background:${color};
-      border:2px solid rgba(255,255,255,0.82);
-      box-shadow:0 0 0 5px ${color}22,0 8px 22px rgba(0,0,0,0.42);
-      font-size:15px;
-      font-weight:900;
-    "><span style="transform:rotate(-45deg);line-height:1">!</span></div>`,
+    html: `<div style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;transform:rotate(45deg);border-radius:8px;color:#fff;background:${color};border:2px solid rgba(255,255,255,.82);box-shadow:0 0 0 5px ${color}22,0 8px 22px rgba(0,0,0,.42);font-size:15px;font-weight:900"><span style="transform:rotate(-45deg);line-height:1">!</span></div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -(size / 2 + 6)],
@@ -165,26 +167,19 @@ function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraClus
 
   for (const camera of cameras) {
     const point = map.project(L.latLng(camera.lat, camera.lng), zoom);
-    const gridKey = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
-    const existing = groups.get(gridKey);
-
-    if (existing) {
-      existing.cameras.push(camera);
-      existing.latSum += camera.lat;
-      existing.lngSum += camera.lng;
+    const key = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
+    const group = groups.get(key);
+    if (group) {
+      group.cameras.push(camera);
+      group.latSum += camera.lat;
+      group.lngSum += camera.lng;
     } else {
-      groups.set(gridKey, {
-        cameras: [camera],
-        latSum: camera.lat,
-        lngSum: camera.lng,
-      });
+      groups.set(key, { cameras: [camera], latSum: camera.lat, lngSum: camera.lng });
     }
   }
 
   return [...groups.entries()].map(([gridKey, group]) => ({
-    key: group.cameras.length === 1
-      ? `camera:${group.cameras[0]!.id}`
-      : `cluster:${zoom}:${gridKey}`,
+    key: group.cameras.length === 1 ? `camera:${group.cameras[0]!.id}` : `cluster:${zoom}:${gridKey}`,
     cameras: group.cameras,
     lat: group.latSum / group.cameras.length,
     lng: group.lngSum / group.cameras.length,
@@ -192,22 +187,65 @@ function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraClus
 }
 
 function clusterSignature(cluster: CameraCluster): string {
-  if (cluster.cameras.length === 1) return cluster.cameras[0]!.id;
-  return cluster.cameras.map((camera) => camera.id).sort().join('|');
+  return cluster.cameras.length === 1
+    ? cluster.cameras[0]!.id
+    : cluster.cameras.map((camera) => camera.id).sort().join('|');
+}
+
+function findNearestCamera(cameras: Camera[], lat: number, lng: number): NearestCamera | null {
+  let nearest: NearestCamera | null = null;
+  for (const camera of cameras) {
+    const distance = getDistance(lat, lng, camera.lat, camera.lng);
+    if (!nearest || distance < nearest.distance) nearest = { camera, distance };
+  }
+  return nearest;
+}
+
+function verificationBlock(nearest: NearestCamera | null, onVerify: (camera: Camera) => void): HTMLElement | null {
+  if (!nearest || nearest.distance > 15_000) return null;
+
+  const verifier = document.createElement('div');
+  verifier.style.marginTop = '10px';
+  verifier.style.paddingTop = '8px';
+  verifier.style.borderTop = '1px solid rgba(255,255,255,0.08)';
+
+  const info = document.createElement('div');
+  info.textContent = `最近可見 CCTV：${nearest.camera.name} · ${formatDistance(nearest.distance)}`;
+  info.style.fontSize = '10px';
+  info.style.lineHeight = '1.45';
+  info.style.color = '#9ca3af';
+  info.style.marginBottom = '7px';
+  verifier.appendChild(info);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = '查看最近監視器';
+  button.style.width = '100%';
+  button.style.padding = '7px 10px';
+  button.style.borderRadius = '9px';
+  button.style.border = '1px solid rgba(59,130,246,0.5)';
+  button.style.background = 'rgba(59,130,246,0.16)';
+  button.style.color = '#93c5fd';
+  button.style.fontSize = '11px';
+  button.style.fontWeight = '800';
+  button.style.cursor = 'pointer';
+  button.addEventListener('click', () => onVerify(nearest.camera));
+  verifier.appendChild(button);
+  return verifier;
 }
 
 function eventSignature(event: TrafficEvent, nearest: NearestCamera | null): string {
-  return [
-    event.id,
-    event.severity,
-    event.lat,
-    event.lng,
-    event.title,
-    event.description,
-    event.publishTime,
-    nearest?.camera.id,
-    nearest ? Math.round(nearest.distance) : undefined,
-  ].join('|');
+  return [event.id, event.severity, event.lat, event.lng, event.title, event.description, event.publishTime, nearest?.camera.id, nearest ? Math.round(nearest.distance) : undefined].join('|');
+}
+
+function flowAnchor(segment: TrafficFlowMapSegment): [number, number] | null {
+  const path = segment.paths.reduce((longest, current) => current.length > longest.length ? current : longest, segment.paths[0] ?? []);
+  if (!path.length) return null;
+  return path[Math.floor(path.length / 2)] ?? null;
+}
+
+function flowSignature(segment: TrafficFlowMapSegment, nearest: NearestCamera | null): string {
+  return [segment.sectionId, segment.travelSpeed, segment.travelTime, segment.congestionLevel, segment.dataCollectTime, nearest?.camera.id, nearest ? Math.round(nearest.distance) : undefined].join('|');
 }
 
 interface Props {
@@ -216,6 +254,7 @@ interface Props {
   onSelect: (c: Camera) => void;
   userLocation?: { lat: number; lng: number } | null;
   trafficEvents?: TrafficEvent[];
+  trafficFlowSegments?: TrafficFlowMapSegment[];
 }
 
 export default function MapInner({
@@ -224,402 +263,260 @@ export default function MapInner({
   onSelect,
   userLocation,
   trafficEvents = [],
+  trafficFlowSegments = [],
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const layerRef = useRef<L.LayerGroup | null>(null);
+  const cameraLayerRef = useRef<L.LayerGroup | null>(null);
   const eventLayerRef = useRef<L.LayerGroup | null>(null);
+  const flowLayerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const renderedMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
   const renderedEventMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
-  const renderFrameRef = useRef<number | null>(null);
-  const eventRenderFrameRef = useRef<number | null>(null);
+  const renderedFlowRef = useRef<Map<string, RenderedFlow>>(new Map());
+  const cameraFrameRef = useRef<number | null>(null);
+  const eventFrameRef = useRef<number | null>(null);
+  const flowFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    mapRef.current = L.map(containerRef.current).setView([23.9, 121.0], 8);
+    const map = L.map(containerRef.current).setView([23.9, 121.0], 8);
+    mapRef.current = map;
 
-    L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        maxZoom: 19,
-        subdomains: 'abcd',
-      }
-    ).addTo(mapRef.current);
-    layerRef.current = L.layerGroup().addTo(mapRef.current);
-    eventLayerRef.current = L.layerGroup().addTo(mapRef.current);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      maxZoom: 19,
+      subdomains: 'abcd',
+    }).addTo(map);
+
+    flowLayerRef.current = L.layerGroup().addTo(map);
+    cameraLayerRef.current = L.layerGroup().addTo(map);
+    eventLayerRef.current = L.layerGroup().addTo(map);
 
     return () => {
-      if (renderFrameRef.current !== null) cancelAnimationFrame(renderFrameRef.current);
-      if (eventRenderFrameRef.current !== null) cancelAnimationFrame(eventRenderFrameRef.current);
+      if (cameraFrameRef.current !== null) cancelAnimationFrame(cameraFrameRef.current);
+      if (eventFrameRef.current !== null) cancelAnimationFrame(eventFrameRef.current);
+      if (flowFrameRef.current !== null) cancelAnimationFrame(flowFrameRef.current);
       renderedMarkersRef.current.clear();
       renderedEventMarkersRef.current.clear();
-      mapRef.current?.remove();
+      renderedFlowRef.current.clear();
+      map.remove();
       mapRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current || !userLocation) return;
-
-    if (userMarkerRef.current) {
-      mapRef.current.removeLayer(userMarkerRef.current);
-    }
+    const map = mapRef.current;
+    if (!map || !userLocation) return;
+    if (userMarkerRef.current) map.removeLayer(userMarkerRef.current);
 
     const userIcon = L.divIcon({
       className: '',
-      html: `<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="14" cy="14" r="12" fill="rgba(59,130,246,0.15)" stroke="rgba(59,130,246,0.3)" stroke-width="1"/>
-        <circle cx="14" cy="14" r="6" fill="#3b82f6" stroke="rgba(255,255,255,0.6)" stroke-width="2"/>
-        <circle cx="14" cy="14" r="2" fill="white"/>
-      </svg>`,
+      html: `<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="rgba(59,130,246,.15)" stroke="rgba(59,130,246,.3)"/><circle cx="14" cy="14" r="6" fill="#3b82f6" stroke="rgba(255,255,255,.6)" stroke-width="2"/><circle cx="14" cy="14" r="2" fill="white"/></svg>`,
       iconSize: [28, 28],
       iconAnchor: [14, 14],
     });
 
-    userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], {
-      icon: userIcon,
-      zIndexOffset: 2000,
-    }).addTo(mapRef.current);
-
-    mapRef.current.setView([userLocation.lat, userLocation.lng], 12, { animate: true });
+    userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 2000 }).addTo(map);
+    map.setView([userLocation.lat, userLocation.lng], 12, { animate: true });
   }, [userLocation]);
 
   useEffect(() => {
-    if (!mapRef.current || !layerRef.current) return;
-
     const map = mapRef.current;
-    const layer = layerRef.current;
+    const layer = cameraLayerRef.current;
+    if (!map || !layer) return;
 
     const createCameraMarker = (camera: Camera): L.Marker => {
-      const marker = L.marker([camera.lat, camera.lng], {
-        icon: makeIcon(camera.type),
-        zIndexOffset: 1000,
-        title: camera.name,
-      });
+      const marker = L.marker([camera.lat, camera.lng], { icon: makeIcon(camera.type), zIndexOffset: 1000, title: camera.name });
       const color = COLORS[camera.type];
-
-      const previewContent = `
-        <div style="width:200px; font-family:'Noto Sans TC',sans-serif;">
-          <div style="position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#0a0e1a; margin-bottom:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
-            <img src="/api/proxy/snapshot?url=${encodeURIComponent(camera.snapshotUrl ?? camera.streamUrl)}" alt="${escapeHtml(camera.name)}"
-              style="width:100%; height:100%; object-fit:cover;"
-              onerror="this.style.display='none'"/>
-          </div>
-          <div style="padding:0 2px;">
-            <div style="font-weight:700; color:#e8ecf4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; line-height:1.4; margin-bottom:4px;">
-              ${escapeHtml(camera.name)}
-            </div>
-            <div style="color:#4b5563; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; font-family:'JetBrains Mono',monospace;">
-              ${escapeHtml(camera.road ?? '—')}
-            </div>
-            <div style="padding-top:8px; border-top:1px solid rgba(255,255,255,0.06); color:${color}; font-size:10px; font-weight:700; text-align:center; letter-spacing:0.05em;">
-              點擊查看
-            </div>
-          </div>
-        </div>
-      `;
-
-      const popup = L.popup({ maxWidth: 220, className: 'leaflet-camera-preview' })
-        .setContent(previewContent);
-
-      marker.on('mouseover', () => {
-        popup.setLatLng(marker.getLatLng()).openOn(map);
-      });
+      const preview = `<div style="width:200px;font-family:'Noto Sans TC',sans-serif"><div style="position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#0a0e1a;margin-bottom:8px;border-radius:8px;border:1px solid rgba(255,255,255,.06)"><img src="/api/proxy/snapshot?url=${encodeURIComponent(camera.snapshotUrl ?? camera.streamUrl)}" alt="${escapeHtml(camera.name)}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/></div><div style="padding:0 2px"><div style="font-weight:700;color:#e8ecf4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;margin-bottom:4px">${escapeHtml(camera.name)}</div><div style="color:#4b5563;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:8px;font-family:'JetBrains Mono',monospace">${escapeHtml(camera.road ?? '—')}</div><div style="padding-top:8px;border-top:1px solid rgba(255,255,255,.06);color:${color};font-size:10px;font-weight:700;text-align:center">點擊查看</div></div></div>`;
+      const popup = L.popup({ maxWidth: 220, className: 'leaflet-camera-preview' }).setContent(preview);
+      marker.on('mouseover', () => popup.setLatLng(marker.getLatLng()).openOn(map));
       marker.on('mouseout', () => map.closePopup(popup));
       marker.on('click', () => {
-        map.setView(marker.getLatLng(), Math.max(map.getZoom(), 13), {
-          animate: true,
-          duration: 0.8,
-        });
+        map.setView(marker.getLatLng(), Math.max(map.getZoom(), 13), { animate: true, duration: 0.8 });
         map.closePopup(popup);
         onSelect(camera);
       });
-
       return marker;
     };
 
-    const createClusterMarker = (cluster: CameraCluster, zoom: number): L.Marker => {
-      const marker = L.marker([cluster.lat, cluster.lng], {
-        icon: makeClusterIcon(cluster.cameras.length),
-        zIndexOffset: 800,
-        keyboard: true,
-        title: `${cluster.cameras.length} 支監視器`,
-      });
-
-      marker.on('click', () => {
-        map.setView([cluster.lat, cluster.lng], Math.min(zoom + 2, 16), {
-          animate: true,
-          duration: 0.6,
-        });
-      });
-
-      return marker;
-    };
-
-    const renderMarkers = () => {
+    const render = () => {
       const q = query.toLowerCase();
-      const paddedBounds = map.getBounds().pad(0.35);
-      const visible = cameras.filter((camera) => {
-        if (!paddedBounds.contains(L.latLng(camera.lat, camera.lng))) return false;
-        if (!query) return true;
-        return (
-          camera.name.toLowerCase().includes(q) ||
-          camera.id.toLowerCase().includes(q) ||
-          (camera.road?.toLowerCase().includes(q) ?? false)
-        );
-      });
-
+      const bounds = map.getBounds().pad(0.35);
+      const visible = cameras.filter((camera) => bounds.contains([camera.lat, camera.lng]) && (!query || camera.name.toLowerCase().includes(q) || camera.id.toLowerCase().includes(q) || (camera.road?.toLowerCase().includes(q) ?? false)));
       const zoom = map.getZoom();
       const clusters = clusterCameras(map, visible, zoom);
-      const nextKeys = new Set<string>();
+      const next = new Set<string>();
 
       for (const cluster of clusters) {
         const signature = clusterSignature(cluster);
-        nextKeys.add(cluster.key);
+        next.add(cluster.key);
         const existing = renderedMarkersRef.current.get(cluster.key);
-
         if (existing?.signature === signature) continue;
-
-        if (existing) {
-          layer.removeLayer(existing.marker);
-          renderedMarkersRef.current.delete(cluster.key);
-        }
+        if (existing) layer.removeLayer(existing.marker);
 
         const marker = cluster.cameras.length > 1
-          ? createClusterMarker(cluster, zoom)
+          ? L.marker([cluster.lat, cluster.lng], { icon: makeClusterIcon(cluster.cameras.length), zIndexOffset: 800, title: `${cluster.cameras.length} 支監視器` })
           : createCameraMarker(cluster.cameras[0]!);
-
+        if (cluster.cameras.length > 1) {
+          marker.on('click', () => map.setView([cluster.lat, cluster.lng], Math.min(zoom + 2, 16), { animate: true, duration: 0.6 }));
+        }
         marker.addTo(layer);
         renderedMarkersRef.current.set(cluster.key, { marker, signature });
       }
 
-      for (const [key, rendered] of renderedMarkersRef.current.entries()) {
-        if (nextKeys.has(key)) continue;
-        layer.removeLayer(rendered.marker);
-        renderedMarkersRef.current.delete(key);
+      for (const [key, rendered] of renderedMarkersRef.current) {
+        if (!next.has(key)) {
+          layer.removeLayer(rendered.marker);
+          renderedMarkersRef.current.delete(key);
+        }
       }
     };
 
-    const scheduleRender = () => {
-      if (renderFrameRef.current !== null) cancelAnimationFrame(renderFrameRef.current);
-      renderFrameRef.current = requestAnimationFrame(() => {
-        renderFrameRef.current = null;
-        renderMarkers();
-      });
+    const schedule = () => {
+      if (cameraFrameRef.current !== null) cancelAnimationFrame(cameraFrameRef.current);
+      cameraFrameRef.current = requestAnimationFrame(() => { cameraFrameRef.current = null; render(); });
     };
-
-    scheduleRender();
-    map.on('moveend', scheduleRender);
-    map.on('zoomend', scheduleRender);
-
+    schedule();
+    map.on('moveend', schedule);
+    map.on('zoomend', schedule);
     return () => {
-      map.off('moveend', scheduleRender);
-      map.off('zoomend', scheduleRender);
-      if (renderFrameRef.current !== null) {
-        cancelAnimationFrame(renderFrameRef.current);
-        renderFrameRef.current = null;
-      }
+      map.off('moveend', schedule);
+      map.off('zoomend', schedule);
+      if (cameraFrameRef.current !== null) cancelAnimationFrame(cameraFrameRef.current);
     };
   }, [cameras, query, onSelect]);
 
   useEffect(() => {
-    if (!mapRef.current || !eventLayerRef.current) return;
-
     const map = mapRef.current;
     const layer = eventLayerRef.current;
+    if (!map || !layer) return;
 
-    const findNearestCamera = (event: TrafficEvent): NearestCamera | null => {
-      if (typeof event.lat !== 'number' || typeof event.lng !== 'number') return null;
-
-      let nearest: NearestCamera | null = null;
-      for (const camera of cameras) {
-        const distance = getDistance(event.lat, event.lng, camera.lat, camera.lng);
-        if (!nearest || distance < nearest.distance) {
-          nearest = { camera, distance };
-        }
-      }
-      return nearest;
-    };
-
-    const createEventPopup = (event: TrafficEvent, nearest: NearestCamera | null): HTMLElement => {
+    const createPopup = (event: TrafficEvent, nearest: NearestCamera | null): HTMLElement => {
       const root = document.createElement('div');
       root.style.width = '230px';
       root.style.fontFamily = "'Noto Sans TC',sans-serif";
-
-      const meta = document.createElement('div');
-      meta.style.display = 'flex';
-      meta.style.alignItems = 'center';
-      meta.style.gap = '6px';
-      meta.style.marginBottom = '8px';
-
-      const badge = document.createElement('span');
       const color = EVENT_COLORS[event.severity];
-      badge.textContent = EVENT_LABELS[event.severity];
-      badge.style.fontSize = '10px';
-      badge.style.fontWeight = '800';
-      badge.style.color = color;
-      badge.style.border = `1px solid ${color}55`;
-      badge.style.background = `${color}18`;
-      badge.style.padding = '2px 7px';
-      badge.style.borderRadius = '9999px';
-      meta.appendChild(badge);
-
-      const provider = document.createElement('span');
-      provider.textContent = 'TDX';
-      provider.style.fontSize = '10px';
-      provider.style.color = '#6b7280';
-      meta.appendChild(provider);
-      root.appendChild(meta);
-
-      const title = document.createElement('div');
-      title.textContent = event.title;
-      title.style.fontSize = '13px';
-      title.style.fontWeight = '800';
-      title.style.lineHeight = '1.45';
-      title.style.color = '#e8ecf4';
-      title.style.marginBottom = '6px';
-      root.appendChild(title);
-
-      if (event.road) {
-        const road = document.createElement('div');
-        road.textContent = `${event.road}${event.direction ? ` · ${event.direction}` : ''}`;
-        road.style.fontSize = '11px';
-        road.style.color = '#9ca3af';
-        road.style.marginBottom = '5px';
-        root.appendChild(road);
-      }
-
-      if (event.description) {
-        const description = document.createElement('div');
-        description.textContent = event.description;
-        description.style.fontSize = '11px';
-        description.style.lineHeight = '1.55';
-        description.style.color = '#cbd5e1';
-        description.style.marginBottom = '6px';
-        root.appendChild(description);
-      }
-
-      const publishTime = formatEventTime(event.publishTime);
-      if (publishTime) {
-        const time = document.createElement('div');
-        time.textContent = `發布 ${publishTime}`;
-        time.style.fontSize = '10px';
-        time.style.color = '#6b7280';
-        time.style.borderTop = '1px solid rgba(255,255,255,0.06)';
-        time.style.paddingTop = '6px';
-        root.appendChild(time);
-      }
-
-      if (nearest && nearest.distance <= 15_000) {
-        const verifier = document.createElement('div');
-        verifier.style.marginTop = '10px';
-        verifier.style.paddingTop = '8px';
-        verifier.style.borderTop = '1px solid rgba(255,255,255,0.08)';
-
-        const cameraInfo = document.createElement('div');
-        cameraInfo.textContent = `最近可見 CCTV：${nearest.camera.name} · ${formatDistance(nearest.distance)}`;
-        cameraInfo.style.fontSize = '10px';
-        cameraInfo.style.lineHeight = '1.45';
-        cameraInfo.style.color = '#9ca3af';
-        cameraInfo.style.marginBottom = '7px';
-        verifier.appendChild(cameraInfo);
-
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = '查看最近監視器';
-        button.style.width = '100%';
-        button.style.padding = '7px 10px';
-        button.style.borderRadius = '9px';
-        button.style.border = '1px solid rgba(59,130,246,0.5)';
-        button.style.background = 'rgba(59,130,246,0.16)';
-        button.style.color = '#93c5fd';
-        button.style.fontSize = '11px';
-        button.style.fontWeight = '800';
-        button.style.cursor = 'pointer';
-        button.addEventListener('click', () => {
-          map.closePopup();
-          onSelect(nearest.camera);
-        });
-        verifier.appendChild(button);
-        root.appendChild(verifier);
-      }
-
+      root.innerHTML = `<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><span style="font-size:10px;font-weight:800;color:${color};border:1px solid ${color}55;background:${color}18;padding:2px 7px;border-radius:9999px">${EVENT_LABELS[event.severity]}</span><span style="font-size:10px;color:#6b7280">TDX</span></div><div style="font-size:13px;font-weight:800;line-height:1.45;color:#e8ecf4;margin-bottom:6px">${escapeHtml(event.title)}</div>${event.road ? `<div style="font-size:11px;color:#9ca3af;margin-bottom:5px">${escapeHtml(event.road)}${event.direction ? ` · ${escapeHtml(event.direction)}` : ''}</div>` : ''}${event.description ? `<div style="font-size:11px;line-height:1.55;color:#cbd5e1;margin-bottom:6px">${escapeHtml(event.description)}</div>` : ''}${formatTime(event.publishTime) ? `<div style="font-size:10px;color:#6b7280;border-top:1px solid rgba(255,255,255,.06);padding-top:6px">發布 ${escapeHtml(formatTime(event.publishTime)!)}</div>` : ''}`;
+      const verify = verificationBlock(nearest, (camera) => { map.closePopup(); onSelect(camera); });
+      if (verify) root.appendChild(verify);
       return root;
     };
 
-    const createEventMarker = (event: TrafficEvent, nearest: NearestCamera | null): L.Marker => {
-      const marker = L.marker([event.lat!, event.lng!], {
-        icon: makeEventIcon(event.severity),
-        zIndexOffset: 1600,
-        keyboard: true,
-        title: event.title,
-      });
-
-      marker.bindPopup(createEventPopup(event, nearest), {
-        maxWidth: 260,
-        className: 'leaflet-camera-preview',
-      });
-      return marker;
-    };
-
-    const renderEvents = () => {
-      const paddedBounds = map.getBounds().pad(0.35);
-      const visible = trafficEvents.filter((event) => {
-        if (typeof event.lat !== 'number' || typeof event.lng !== 'number') return false;
-        if (!Number.isFinite(event.lat) || !Number.isFinite(event.lng)) return false;
-        return paddedBounds.contains(L.latLng(event.lat, event.lng));
-      });
-      const nextKeys = new Set<string>();
-
+    const render = () => {
+      const bounds = map.getBounds().pad(0.35);
+      const visible = trafficEvents.filter((event) => typeof event.lat === 'number' && typeof event.lng === 'number' && Number.isFinite(event.lat) && Number.isFinite(event.lng) && bounds.contains([event.lat, event.lng]));
+      const next = new Set<string>();
       for (const event of visible) {
-        const nearest = findNearestCamera(event);
+        const nearest = findNearestCamera(cameras, event.lat!, event.lng!);
         const key = `event:${event.id}`;
         const signature = eventSignature(event, nearest);
-        nextKeys.add(key);
+        next.add(key);
         const existing = renderedEventMarkersRef.current.get(key);
-
         if (existing?.signature === signature) continue;
-
-        if (existing) {
-          layer.removeLayer(existing.marker);
-          renderedEventMarkersRef.current.delete(key);
-        }
-
-        const marker = createEventMarker(event, nearest);
+        if (existing) layer.removeLayer(existing.marker);
+        const marker = L.marker([event.lat!, event.lng!], { icon: makeEventIcon(event.severity), zIndexOffset: 1600, title: event.title });
+        marker.bindPopup(createPopup(event, nearest), { maxWidth: 260, className: 'leaflet-camera-preview' });
         marker.addTo(layer);
         renderedEventMarkersRef.current.set(key, { marker, signature });
       }
-
-      for (const [key, rendered] of renderedEventMarkersRef.current.entries()) {
-        if (nextKeys.has(key)) continue;
-        layer.removeLayer(rendered.marker);
-        renderedEventMarkersRef.current.delete(key);
+      for (const [key, rendered] of renderedEventMarkersRef.current) {
+        if (!next.has(key)) {
+          layer.removeLayer(rendered.marker);
+          renderedEventMarkersRef.current.delete(key);
+        }
       }
     };
 
-    const scheduleEventRender = () => {
-      if (eventRenderFrameRef.current !== null) cancelAnimationFrame(eventRenderFrameRef.current);
-      eventRenderFrameRef.current = requestAnimationFrame(() => {
-        eventRenderFrameRef.current = null;
-        renderEvents();
-      });
+    const schedule = () => {
+      if (eventFrameRef.current !== null) cancelAnimationFrame(eventFrameRef.current);
+      eventFrameRef.current = requestAnimationFrame(() => { eventFrameRef.current = null; render(); });
     };
-
-    scheduleEventRender();
-    map.on('moveend', scheduleEventRender);
-    map.on('zoomend', scheduleEventRender);
-
+    schedule();
+    map.on('moveend', schedule);
+    map.on('zoomend', schedule);
     return () => {
-      map.off('moveend', scheduleEventRender);
-      map.off('zoomend', scheduleEventRender);
-      if (eventRenderFrameRef.current !== null) {
-        cancelAnimationFrame(eventRenderFrameRef.current);
-        eventRenderFrameRef.current = null;
-      }
+      map.off('moveend', schedule);
+      map.off('zoomend', schedule);
+      if (eventFrameRef.current !== null) cancelAnimationFrame(eventFrameRef.current);
     };
   }, [cameras, onSelect, trafficEvents]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const layer = flowLayerRef.current;
+    if (!map || !layer) return;
+
+    const createPopup = (segment: TrafficFlowMapSegment, nearest: NearestCamera | null): HTMLElement => {
+      const root = document.createElement('div');
+      root.style.width = '235px';
+      root.style.fontFamily = "'Noto Sans TC',sans-serif";
+      const color = congestionColor(segment.congestionLevel);
+      const title = segment.roadName ?? segment.sectionName ?? segment.roadId ?? `路段 ${segment.sectionId}`;
+      const sectionDetail = segment.sectionName ?? [segment.start, segment.end].filter(Boolean).join(' → ');
+      const speed = segment.travelSpeed !== undefined ? `${Math.round(segment.travelSpeed)} km/h` : '—';
+      const travel = formatTravelTime(segment.travelTime) ?? '—';
+      const collected = formatTime(segment.dataCollectTime);
+
+      root.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:10px;font-weight:800;color:${color};border:1px solid ${color}66;background:${color}18;padding:2px 7px;border-radius:9999px">${congestionLabel(segment.congestionLevel)}</span><span style="font-size:10px;color:#6b7280">TDX 即時路況</span></div><div style="font-size:13px;font-weight:800;color:#e8ecf4;line-height:1.45;margin-bottom:5px">${escapeHtml(title)}</div>${sectionDetail && sectionDetail !== title ? `<div style="font-size:11px;color:#9ca3af;margin-bottom:8px">${escapeHtml(sectionDetail)}${segment.roadDirection ? ` · ${escapeHtml(segment.roadDirection)}` : ''}</div>` : ''}<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:7px"><div style="padding:7px;border-radius:8px;background:rgba(255,255,255,.04)"><div style="font-size:9px;color:#6b7280">平均速度</div><div style="font-size:13px;font-weight:800;color:#e8ecf4">${speed}</div></div><div style="padding:7px;border-radius:8px;background:rgba(255,255,255,.04)"><div style="font-size:9px;color:#6b7280">旅行時間</div><div style="font-size:13px;font-weight:800;color:#e8ecf4">${travel}</div></div></div>${collected ? `<div style="font-size:10px;color:#6b7280">資料 ${escapeHtml(collected)}</div>` : ''}`;
+      const verify = verificationBlock(nearest, (camera) => { map.closePopup(); onSelect(camera); });
+      if (verify) root.appendChild(verify);
+      return root;
+    };
+
+    const render = () => {
+      const bounds = map.getBounds().pad(0.35);
+      const visible = trafficFlowSegments.filter((segment) => segment.paths.some((path) => path.length >= 2 && bounds.intersects(L.latLngBounds(path))));
+      const next = new Set<string>();
+
+      for (const segment of visible) {
+        const anchor = flowAnchor(segment);
+        const nearest = anchor ? findNearestCamera(cameras, anchor[0], anchor[1]) : null;
+        const key = `flow:${segment.sectionId}`;
+        const signature = flowSignature(segment, nearest);
+        next.add(key);
+        const existing = renderedFlowRef.current.get(key);
+        if (existing?.signature === signature) continue;
+        if (existing) layer.removeLayer(existing.polyline);
+
+        const color = congestionColor(segment.congestionLevel);
+        const polyline = L.polyline(segment.paths, {
+          color,
+          weight: (segment.congestionLevel ?? 0) >= 3 ? 7 : 5,
+          opacity: segment.congestionLevel === -99 || segment.congestionLevel === 0 ? 0.5 : 0.82,
+          lineCap: 'round',
+          lineJoin: 'round',
+          interactive: true,
+        });
+        polyline.bindPopup(createPopup(segment, nearest), { maxWidth: 270, className: 'leaflet-camera-preview' });
+        polyline.on('mouseover', () => polyline.setStyle({ weight: ((segment.congestionLevel ?? 0) >= 3 ? 9 : 7), opacity: 1 }));
+        polyline.on('mouseout', () => polyline.setStyle({ weight: ((segment.congestionLevel ?? 0) >= 3 ? 7 : 5), opacity: segment.congestionLevel === -99 || segment.congestionLevel === 0 ? 0.5 : 0.82 }));
+        polyline.addTo(layer);
+        renderedFlowRef.current.set(key, { polyline, signature });
+      }
+
+      for (const [key, rendered] of renderedFlowRef.current) {
+        if (!next.has(key)) {
+          layer.removeLayer(rendered.polyline);
+          renderedFlowRef.current.delete(key);
+        }
+      }
+    };
+
+    const schedule = () => {
+      if (flowFrameRef.current !== null) cancelAnimationFrame(flowFrameRef.current);
+      flowFrameRef.current = requestAnimationFrame(() => { flowFrameRef.current = null; render(); });
+    };
+    schedule();
+    map.on('moveend', schedule);
+    map.on('zoomend', schedule);
+    return () => {
+      map.off('moveend', schedule);
+      map.off('zoomend', schedule);
+      if (flowFrameRef.current !== null) cancelAnimationFrame(flowFrameRef.current);
+    };
+  }, [cameras, onSelect, trafficFlowSegments]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }
