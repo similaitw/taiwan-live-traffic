@@ -6,32 +6,44 @@
 
 ## Current task
 
-### M5.2 — Road navigator
+### M5.3 — Nearby mode
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 同一道路 Camera 優先依方向分組，再依 `mile` 由小到大排序。
-- [ ] Camera 詳細資訊提供「上一支／下一支」沿線導航。
-- [ ] 手機 Bottom Sheet 與桌面直播畫面都可切換沿線 Camera。
-- [ ] 切換 Camera 時同步更新最近觀看與 `camera=` URL。
-- [ ] 無法判斷里程時保持穩定排序，不因缺值崩潰。
+- [ ] 新增 5 / 10 / 20 km 附近模式。
+- [ ] 啟用附近模式後只顯示半徑內 Camera，並依距離由近到遠排序。
+- [ ] 若尚未取得定位，選擇附近模式時主動觸發定位。
+- [ ] 桌面與手機都提供附近模式入口。
+- [ ] URL 支援 `nearby=5|10|20`，分享／重開可恢復設定。
+- [ ] 與道路／類型／搜尋等一般篩選可疊加使用。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M5.3 — Nearby mode。
+完成後 V2 MVP（M1–M5）結案，後續進入 M6 即時交通事件規劃。
 
 ---
 
 ## 已完成任務
+
+### M5.2 — Road navigator（已完成）
+
+**Executor: ChatGPT**
+
+- [x] 新增 `getRoadNeighbors`，同一道路優先使用相同方向序列，再依里程排序。
+- [x] 缺少里程時以名稱／ID 穩定排序，不因資料缺值失敗。
+- [x] 新增 `RoadCameraNavigator`，提供上一支／下一支與目前位置。
+- [x] 手機 Bottom Sheet 與桌面直播畫面均可沿線切換 Camera。
+- [x] 切換沿用既有選取 handler，同步最近觀看與 `camera=` URL。
+- [x] GitHub Actions run `34704427438` Build step 成功。
 
 ### M5.1 — Road grouping（已完成）
 
 **Executor: ChatGPT**
 
 - [x] 新增 `lib/roads.ts`，由 `roadNumber` / `road` / name 自動辨識道路編號。
-- [x] 自動建立道路群組與 Camera 數量，國道、省道、縣道、鄉道依類型／號碼排序。
-- [x] 新增共用 `RoadFilter`，桌面與手機皆可使用。
+- [x] 自動建立道路群組與 Camera 數量。
+- [x] 新增 `RoadFilter`，桌面與手機皆可使用。
 - [x] 道路篩選同步作用於地圖與清單。
 - [x] URL 支援 `road=` 並可於重開時恢復。
 - [x] GitHub Actions run `34704232348` 成功。
@@ -79,9 +91,9 @@
 - [x] M4.3 Share / URL state
 
 ### M5 — 道路模式
-- [x] M5.1 Road grouping — **ChatGPT**
-- [ ] M5.2 Road navigator — **ChatGPT**
-- [ ] M5.3 Nearby mode
+- [x] M5.1 Road grouping
+- [x] M5.2 Road navigator
+- [ ] M5.3 Nearby mode — **ChatGPT**
 
 ---
 
