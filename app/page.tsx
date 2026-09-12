@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { Camera } from '@/types/camera';
 import { getDistance } from '@/lib/geo';
 import { useGeolocation } from '@/hooks/useGeolocation';
@@ -10,6 +10,7 @@ import SearchBar from '@/components/SearchBar';
 import CameraList from '@/components/CameraList';
 import CameraModal from '@/components/CameraModal';
 import CameraBottomSheet from '@/components/CameraBottomSheet';
+import CameraShareButton from '@/components/CameraShareButton';
 import Map from '@/components/Map';
 
 type View = 'map' | 'list';
@@ -33,6 +34,10 @@ const TYPE_COLOR: Record<Camera['type'] | 'all', string> = {
   county: 'var(--accent-county)',
 };
 
+function validCameraType(value: string | null): value is Camera['type'] {
+  return value === 'freeway' || value === 'provincial' || value === 'county';
+}
+
 export default function HomePage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +50,9 @@ export default function HomePage() {
   const [sortByNearest, setSortByNearest] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [recentOnly, setRecentOnly] = useState(false);
+  const [urlReady, setUrlReady] = useState(false);
+  const pendingCameraIdRef = useRef<string | null>(null);
+  const restoredCameraIdRef = useRef<string | null>(null);
   const { favoriteIds, isFavorite, toggleFavorite } = useFavorites();
   const { recentIds, addRecent } = useRecentCameras();
   const {
@@ -52,6 +60,25 @@ export default function HomePage() {
     error: geolocationError,
     locate: locateMe,
   } = useGeolocation({ autoLocate: true });
+
+  const updateUrl = useCallback((updates: Record<string, string | null>) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    });
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setQuery(params.get('q') ?? '');
+    const type = params.get('type');
+    if (validCameraType(type)) setTypeFilter(type);
+    pendingCameraIdRef.current = params.get('camera');
+    setUrlReady(true);
+  }, []);
 
   useEffect(() => {
     fetch('/api/cameras')
@@ -64,21 +91,63 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!urlReady) return;
+    updateUrl({
+      q: query.trim() || null,
+      type: typeFilter === 'all' ? null : typeFilter,
+    });
+  }, [query, typeFilter, updateUrl, urlReady]);
+
+  useEffect(() => {
+    if (!urlReady || loading || cameras.length === 0) return;
+    const cameraId = pendingCameraIdRef.current;
+    if (!cameraId || restoredCameraIdRef.current === cameraId) return;
+
+    const camera = cameras.find((item) => item.id === cameraId);
+    if (!camera) {
+      pendingCameraIdRef.current = null;
+      updateUrl({ camera: null });
+      return;
+    }
+
+    restoredCameraIdRef.current = cameraId;
+    addRecent(camera.id);
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      setMobileSelected(camera);
+    } else {
+      setLiveCamera(camera);
+    }
+  }, [addRecent, cameras, loading, updateUrl, urlReady]);
+
   const handleDesktopSelect = useCallback((camera: Camera) => {
     addRecent(camera.id);
+    updateUrl({ camera: camera.id });
     setLiveCamera(camera);
-  }, [addRecent]);
+  }, [addRecent, updateUrl]);
 
   const handleMobileSelect = useCallback((camera: Camera) => {
     addRecent(camera.id);
+    updateUrl({ camera: camera.id });
     setMobileSelected(camera);
-  }, [addRecent]);
+  }, [addRecent, updateUrl]);
 
   const handleOpenLive = useCallback((camera: Camera) => {
     addRecent(camera.id);
+    updateUrl({ camera: camera.id });
     setMobileSelected(null);
     setLiveCamera(camera);
-  }, [addRecent]);
+  }, [addRecent, updateUrl]);
+
+  const handleCloseMobile = useCallback(() => {
+    setMobileSelected(null);
+    updateUrl({ camera: null });
+  }, [updateUrl]);
+
+  const handleCloseLive = useCallback(() => {
+    setLiveCamera(null);
+    updateUrl({ camera: null });
+  }, [updateUrl]);
 
   const handleToggleFavorite = useCallback(
     (camera: Camera) => toggleFavorite(camera.id),
@@ -413,12 +482,17 @@ export default function HomePage() {
 
       <CameraBottomSheet
         camera={mobileSelected}
-        onClose={() => setMobileSelected(null)}
+        onClose={handleCloseMobile}
         onOpenLive={handleOpenLive}
         favorite={mobileSelected ? isFavorite(mobileSelected.id) : false}
         onToggleFavorite={handleToggleFavorite}
       />
-      <CameraModal camera={liveCamera} onClose={() => setLiveCamera(null)} />
+      <CameraModal camera={liveCamera} onClose={handleCloseLive} />
+      {liveCamera && (
+        <div className="hidden md:block fixed top-5 right-5 z-[100000]">
+          <CameraShareButton camera={liveCamera} />
+        </div>
+      )}
     </div>
   );
 }
