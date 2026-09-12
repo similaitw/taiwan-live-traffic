@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import type { Camera } from '@/types/camera';
 import { getDistance } from '@/lib/geo';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { useFavorites } from '@/hooks/useFavorites';
 import SearchBar from '@/components/SearchBar';
 import CameraList from '@/components/CameraList';
 import CameraModal from '@/components/CameraModal';
@@ -41,6 +42,8 @@ export default function HomePage() {
   const [liveCamera, setLiveCamera] = useState<Camera | null>(null);
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
   const [sortByNearest, setSortByNearest] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const { favoriteIds, isFavorite, toggleFavorite } = useFavorites();
   const {
     location: userLocation,
     error: geolocationError,
@@ -64,9 +67,15 @@ export default function HomePage() {
     setMobileSelected(null);
     setLiveCamera(camera);
   }, []);
+  const handleToggleFavorite = useCallback(
+    (camera: Camera) => toggleFavorite(camera.id),
+    [toggleFavorite]
+  );
 
+  const favoriteIdSet = new Set(favoriteIds);
   const filtered = cameras
     .filter((camera) => {
+      if (favoritesOnly && !favoriteIdSet.has(camera.id)) return false;
       if (typeFilter !== 'all' && camera.type !== typeFilter) return false;
       if (!query) return true;
       const q = query.toLowerCase();
@@ -90,6 +99,7 @@ export default function HomePage() {
       : filtered;
 
   const filteredCameras = sorted.map((item) => item.camera);
+  const favoriteCount = cameras.filter((camera) => favoriteIdSet.has(camera.id)).length;
 
   const counts = {
     all: cameras.length,
@@ -122,6 +132,22 @@ export default function HomePage() {
         </button>
       );
     });
+
+  const favoriteChip = (floating = false) => (
+    <button
+      type="button"
+      onClick={() => setFavoritesOnly((value) => !value)}
+      className={`shrink-0 rounded-full text-xs font-bold tracking-wide transition-all duration-200 ${floating ? 'px-3 py-2 backdrop-blur-xl' : 'px-3 py-1.5'}`}
+      style={{
+        background: favoritesOnly ? 'rgba(245,158,11,0.95)' : floating ? 'rgba(10,14,26,0.82)' : 'rgba(255,255,255,0.04)',
+        color: favoritesOnly ? '#fff' : 'var(--text-secondary)',
+        border: `1px solid ${favoritesOnly ? 'rgba(245,158,11,0.95)' : 'var(--border-subtle)'}`,
+        boxShadow: favoritesOnly ? '0 0 16px rgba(245,158,11,0.28)' : floating ? '0 6px 20px rgba(0,0,0,0.28)' : 'none',
+      }}
+    >
+      ★ 收藏 {favoriteCount}
+    </button>
+  );
 
   return (
     <div className="h-screen overflow-hidden relative noise" style={{ background: 'var(--bg-primary)' }}>
@@ -179,6 +205,7 @@ export default function HomePage() {
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   {typeChips()}
+                  {favoriteChip()}
                 </div>
 
                 <div className="flex items-center gap-2 mt-3">
@@ -228,6 +255,8 @@ export default function HomePage() {
                   query={query}
                   onSelect={handleDesktopSelect}
                   variant="sidebar"
+                  favoriteIds={favoriteIds}
+                  onToggleFavorite={handleToggleFavorite}
                 />
               </div>
             </aside>
@@ -251,6 +280,7 @@ export default function HomePage() {
 
             <div className="absolute left-3 right-3 top-[4.5rem] z-40 flex gap-2 overflow-x-auto pb-1">
               {typeChips(true)}
+              {favoriteChip(true)}
             </div>
 
             <div className="absolute right-3 top-[8.25rem] z-40 flex flex-col items-end gap-2">
@@ -319,7 +349,13 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="h-full overflow-y-auto px-3 pt-32 pb-24">
-                <CameraList cameras={filteredCameras} query={query} onSelect={handleMobileSelect} />
+                <CameraList
+                  cameras={filteredCameras}
+                  query={query}
+                  onSelect={handleMobileSelect}
+                  favoriteIds={favoriteIds}
+                  onToggleFavorite={handleToggleFavorite}
+                />
               </div>
             )}
           </div>
@@ -330,6 +366,8 @@ export default function HomePage() {
         camera={mobileSelected}
         onClose={() => setMobileSelected(null)}
         onOpenLive={handleOpenLive}
+        favorite={mobileSelected ? isFavorite(mobileSelected.id) : false}
+        onToggleFavorite={handleToggleFavorite}
       />
       <CameraModal camera={liveCamera} onClose={() => setLiveCamera(null)} />
     </div>
