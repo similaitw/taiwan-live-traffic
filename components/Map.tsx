@@ -4,10 +4,13 @@ import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import type { Camera } from '@/types/camera';
 import type { TrafficEvent, TrafficEventsResponse } from '@/types/traffic-event';
+import type { TrafficFlowMapSegment, TrafficFlowResponse } from '@/types/traffic-flow';
+import type { TrafficSectionsResponse } from '@/types/traffic-section';
 
 const MapInner = dynamic(() => import('./MapInner'), { ssr: false });
 
 type EventFilter = 'all' | 'important' | 'serious';
+type FlowFilter = 'all' | 'congested';
 
 interface Props {
   cameras: Camera[];
@@ -21,6 +24,12 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   const [trafficEnabled, setTrafficEnabled] = useState(false);
   const [showTrafficEvents, setShowTrafficEvents] = useState(true);
   const [eventFilter, setEventFilter] = useState<EventFilter>('all');
+
+  const [trafficFlow, setTrafficFlow] = useState<TrafficFlowResponse | null>(null);
+  const [trafficSections, setTrafficSections] = useState<TrafficSectionsResponse | null>(null);
+  const [flowEnabled, setFlowEnabled] = useState(false);
+  const [showTrafficFlow, setShowTrafficFlow] = useState(true);
+  const [flowFilter, setFlowFilter] = useState<FlowFilter>('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +55,34 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all([
+      fetch('/api/traffic-flow')
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.json() as Promise<TrafficFlowResponse>;
+        })
+        .catch(() => null),
+      fetch('/api/traffic-sections')
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.json() as Promise<TrafficSectionsResponse>;
+        })
+        .catch(() => null),
+    ]).then(([flow, sections]) => {
+      if (cancelled) return;
+      setTrafficFlow(flow);
+      setTrafficSections(sections);
+      setFlowEnabled(Boolean(flow?.enabled && sections?.enabled));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const filteredTrafficEvents = useMemo(() => {
     if (eventFilter === 'serious') {
       return trafficEvents.filter((event) => event.severity === 'serious');
@@ -55,6 +92,38 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
     }
     return trafficEvents;
   }, [eventFilter, trafficEvents]);
+
+  const congestionSegments = useMemo<TrafficFlowMapSegment[]>(() => {
+    if (!trafficFlow?.enabled || !trafficSections?.enabled) return [];
+
+    const sectionById = new Map(
+      trafficSections.sections.map((section) => [section.sectionId, section] as const),
+    );
+
+    return trafficFlow.segments
+      .map((flow): TrafficFlowMapSegment | null => {
+        const section = sectionById.get(flow.sectionId);
+        if (!section || section.paths.length === 0) return null;
+        return {
+          ...flow,
+          roadId: section.roadId,
+          roadName: section.roadName,
+          roadDirection: section.roadDirection,
+          sectionName: section.sectionName,
+          start: section.start,
+          end: section.end,
+          paths: section.paths,
+        };
+      })
+      .filter((segment): segment is TrafficFlowMapSegment => segment !== null);
+  }, [trafficFlow, trafficSections]);
+
+  const filteredCongestionSegments = useMemo(() => {
+    if (flowFilter === 'congested') {
+      return congestionSegments.filter((segment) => (segment.congestionLevel ?? 0) >= 3);
+    }
+    return congestionSegments;
+  }, [congestionSegments, flowFilter]);
 
   return (
     <div
@@ -70,43 +139,85 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         onSelect={onSelect}
         userLocation={userLocation}
         trafficEvents={showTrafficEvents ? filteredTrafficEvents : []}
+        trafficFlowSegments={showTrafficFlow ? filteredCongestionSegments : []}
       />
 
-      {trafficEnabled && (
-        <div className="absolute right-3 bottom-16 md:bottom-auto md:top-3 z-[900] flex items-center gap-2">
-          {showTrafficEvents && trafficEvents.length > 0 && (
-            <select
-              value={eventFilter}
-              onChange={(event) => setEventFilter(event.target.value as EventFilter)}
-              className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl"
-              style={{
-                background: 'rgba(10,14,26,0.9)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-subtle)',
-                boxShadow: '0 8px 22px rgba(0,0,0,0.28)',
-              }}
-              aria-label="交通事件嚴重程度"
-            >
-              <option value="all">全部事件</option>
-              <option value="important">警示以上</option>
-              <option value="serious">嚴重事件</option>
-            </select>
+      {(trafficEnabled || flowEnabled) && (
+        <div className="absolute right-3 bottom-16 md:bottom-auto md:top-3 z-[900] flex flex-col items-end gap-2">
+          {flowEnabled && (
+            <div className="flex items-center gap-2">
+              {showTrafficFlow && congestionSegments.length > 0 && (
+                <select
+                  value={flowFilter}
+                  onChange={(event) => setFlowFilter(event.target.value as FlowFilter)}
+                  className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl"
+                  style={{
+                    background: 'rgba(10,14,26,0.9)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-subtle)',
+                    boxShadow: '0 8px 22px rgba(0,0,0,0.28)',
+                  }}
+                  aria-label="即時路況篩選"
+                >
+                  <option value="all">全部路況</option>
+                  <option value="congested">只看壅塞</option>
+                </select>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowTrafficFlow((value) => !value)}
+                className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all"
+                style={{
+                  background: showTrafficFlow ? 'rgba(16,185,129,0.9)' : 'rgba(10,14,26,0.86)',
+                  color: '#fff',
+                  border: `1px solid ${showTrafficFlow ? 'rgba(52,211,153,0.85)' : 'var(--border-subtle)'}`,
+                  boxShadow: '0 8px 22px rgba(0,0,0,0.3)',
+                }}
+                aria-pressed={showTrafficFlow}
+              >
+                🚗 即時路況 {showTrafficFlow ? filteredCongestionSegments.length : congestionSegments.length}
+              </button>
+            </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => setShowTrafficEvents((value) => !value)}
-            className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all"
-            style={{
-              background: showTrafficEvents ? 'rgba(239,68,68,0.92)' : 'rgba(10,14,26,0.86)',
-              color: '#fff',
-              border: `1px solid ${showTrafficEvents ? 'rgba(248,113,113,0.9)' : 'var(--border-subtle)'}`,
-              boxShadow: '0 8px 22px rgba(0,0,0,0.3)',
-            }}
-            aria-pressed={showTrafficEvents}
-          >
-            ⚠ 交通事件 {showTrafficEvents ? filteredTrafficEvents.length : trafficEvents.length}
-          </button>
+          {trafficEnabled && (
+            <div className="flex items-center gap-2">
+              {showTrafficEvents && trafficEvents.length > 0 && (
+                <select
+                  value={eventFilter}
+                  onChange={(event) => setEventFilter(event.target.value as EventFilter)}
+                  className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl"
+                  style={{
+                    background: 'rgba(10,14,26,0.9)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-subtle)',
+                    boxShadow: '0 8px 22px rgba(0,0,0,0.28)',
+                  }}
+                  aria-label="交通事件嚴重程度"
+                >
+                  <option value="all">全部事件</option>
+                  <option value="important">警示以上</option>
+                  <option value="serious">嚴重事件</option>
+                </select>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowTrafficEvents((value) => !value)}
+                className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all"
+                style={{
+                  background: showTrafficEvents ? 'rgba(239,68,68,0.92)' : 'rgba(10,14,26,0.86)',
+                  color: '#fff',
+                  border: `1px solid ${showTrafficEvents ? 'rgba(248,113,113,0.9)' : 'var(--border-subtle)'}`,
+                  boxShadow: '0 8px 22px rgba(0,0,0,0.3)',
+                }}
+                aria-pressed={showTrafficEvents}
+              >
+                ⚠ 交通事件 {showTrafficEvents ? filteredTrafficEvents.length : trafficEvents.length}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
