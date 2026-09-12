@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",
-    "fast-xml-parser": "^5.5.9",
+    "fast-xml-parser": "^5.11.1",
     "leaflet": "^1.9.4",
-    "next": "^16.2.1",
+    "next": "^16.3.5",
     "react": "^18",
     "react-dom": "^18",
     "swr": "^2.4.1"
