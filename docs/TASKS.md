@@ -6,7 +6,24 @@
 
 ## Current task
 
-### M1.1 — Camera V2 data model
+### M1.2 — 共用 geo utilities
+
+目標／範圍：
+
+- [ ] 新增 `lib/geo.ts`。
+- [ ] 把 Haversine distance 從 `app/page.tsx` 與 `components/MapInner.tsx` 移出。
+- [ ] 最近排序結果保持一致。
+- [ ] `npm run build` 通過；若已有相關測試，也要執行。
+
+完成後更新 Current task 為 M1.3 — hooks 基礎拆分，commit 並 push 到 main。
+
+---
+
+## 已完成任務
+
+### M1.1 — Camera V2 data model（已完成）
+
+驗證：`npm run build` 通過；8 組 normalizer 案例（含相容性、重複正規化與不修改輸入）通過。現有專案無相關測試套件。
 
 目標：擴充 Camera 資料模型與正規化層，但不改 UI、不改 `/api/cameras` response shape。
 
@@ -19,16 +36,16 @@
 
 必要工作：
 
-- [ ] 擴充 `Camera` interface：`provider`、`roadNumber`、`mile`、`county`、`district`、`streamType`、`status`、`lastCheckedAt`、`lastFrameAt`、`tags`。
-- [ ] 新增 `CameraType`、`CameraStatus` type。
-- [ ] 新增 `lib/camera-normalizer.ts`。
-- [ ] normalizer 至少能處理道路名稱／道路編號／公里數／方向／tags 的基礎正規化。
-- [ ] `freeway.ts` 使用 normalizer，能取得時補 `provider`、`roadNumber`、`mile`、`tags`。
-- [ ] `thb.ts` 使用 normalizer，能取得時補 `provider`、`roadNumber`、`mile`、`tags`。
-- [ ] 所有新增欄位先保持 optional，相容既有資料來源。
-- [ ] 不修改 UI。
-- [ ] 不修改 `/api/cameras` response shape。
-- [ ] `npm run build` 通過。
+- [x] 擴充 `Camera` interface：`provider`、`roadNumber`、`mile`、`county`、`district`、`streamType`、`status`、`lastCheckedAt`、`lastFrameAt`、`tags`。
+- [x] 新增 `CameraType`、`CameraStatus` type。
+- [x] 新增 `lib/camera-normalizer.ts`。
+- [x] normalizer 至少能處理道路名稱／道路編號／公里數／方向／tags 的基礎正規化。
+- [x] `freeway.ts` 使用 normalizer，能取得時補 `provider`、`roadNumber`、`mile`、`tags`。
+- [x] `thb.ts` 使用 normalizer，能取得時補 `provider`、`roadNumber`、`mile`、`tags`。
+- [x] 所有新增欄位先保持 optional，相容既有資料來源。
+- [x] 不修改 UI。
+- [x] 不修改 `/api/cameras` response shape。
+- [x] `npm run build` 通過。
 
 完成後請：
 
@@ -43,7 +60,7 @@
 
 ### M1 — 基礎整理與資料模型
 
-- [ ] M1.1 Camera V2 data model
+- [x] M1.1 Camera V2 data model
 - [ ] M1.2 共用 geo utilities
 - [ ] M1.3 hooks 基礎拆分
 

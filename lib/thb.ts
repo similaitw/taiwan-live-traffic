@@ -1,4 +1,5 @@
 import type { Camera } from '@/types/camera';
+import { normalizeCamera } from '@/lib/camera-normalizer';
 
 const THB_PROVINCIAL = 'https://thbapp.thb.gov.tw/services/cctv/thb';
 const THB_COUNTY = 'https://thbapp.thb.gov.tw/services/cctv/county';
@@ -24,7 +25,9 @@ interface THBCamera {
   snapshotUrl?: string;
   thumbnailurl?: string;
   ThumbnailUrl?: string;
-  stakenumber?: string;
+  stakenumber?: string | number;
+  direction?: string;
+  RoadDirection?: string;
   [key: string]: unknown;
 }
 
@@ -39,7 +42,7 @@ function mapTHB(raw: THBCamera, type: 'provincial' | 'county'): Camera | null {
     (raw.location as string) ??
     (raw.roadname as string) ??
     (raw.RoadName as string) ??
-    (raw.stakenumber as string) ??
+    (raw.stakenumber === undefined ? undefined : String(raw.stakenumber)) ??
     id;
   
   // THB uses 'html' field for stream URL, try multiple field names
@@ -56,7 +59,7 @@ function mapTHB(raw: THBCamera, type: 'provincial' | 'county'): Camera | null {
                       (raw.ThumbnailUrl as string) ??
                       undefined;
 
-  return {
+  return normalizeCamera({
     id: `${type}-${id}`,
     name,
     type,
@@ -64,8 +67,11 @@ function mapTHB(raw: THBCamera, type: 'provincial' | 'county'): Camera | null {
     lng,
     streamUrl,
     snapshotUrl,
-    road: (raw.roadname as string) ?? (raw.RoadName as string) ?? (raw.stakenumber as string),
-  };
+    road: raw.roadname ?? raw.RoadName ?? (raw.stakenumber === undefined ? undefined : String(raw.stakenumber)),
+    provider: '公路局',
+    mile: raw.stakenumber,
+    direction: raw.direction ?? raw.RoadDirection,
+  });
 }
 
 async function fetchTHB(url: string, type: 'provincial' | 'county'): Promise<Camera[]> {
