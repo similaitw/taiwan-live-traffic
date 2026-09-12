@@ -6,46 +6,51 @@
 
 ## Current task
 
-### M5.3 — Nearby mode
+### M6.1 — TDX road-event foundation
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 新增 5 / 10 / 20 km 附近模式。
-- [ ] 啟用附近模式後只顯示半徑內 Camera，並依距離由近到遠排序。
-- [ ] 若尚未取得定位，選擇附近模式時主動觸發定位。
-- [ ] 桌面與手機都提供附近模式入口。
-- [ ] URL 支援 `nearby=5|10|20`，分享／重開可恢復設定。
-- [ ] 與道路／類型／搜尋等一般篩選可疊加使用。
+- [ ] 新增 `TrafficEvent` 資料模型與 TDX road-event normalizer。
+- [ ] 先串接 TDX `道路事件 v1` 的國道即時事件，伺服器端使用 `TDX_CLIENT_ID` / `TDX_CLIENT_SECRET`，金鑰不得送到瀏覽器。
+- [ ] 新增 `/api/traffic-events`；未設定 TDX 金鑰時要安全回傳 `enabled: false`，不得讓網站或 build 失敗。
+- [ ] 支援 TDX OAuth token 記憶體快取，避免每次 API request 都重新取 token。
+- [ ] normalizer 至少處理 `EventID`、`EventTitle`、`Positions` WKT `POINT(lng lat)`、`Location.FreeExpressHighway.Road`、`Impact.Description`、`PublishTime` / `EffectiveTime`。
+- [ ] 上游回應兼容裸 array 與 `{ RoadEvents: [...] }` envelope。
+- [ ] API 對 TDX 暫時性失敗採 graceful degradation，回傳空事件＋來源狀態，不影響 Camera 功能。
 - [ ] GitHub Actions CI build 通過。
 
-完成後 V2 MVP（M1–M5）結案，後續進入 M6 即時交通事件規劃。
+完成後將 Current task 更新成 M6.2 — Traffic event map overlay。
 
 ---
 
 ## 已完成任務
 
-### M5.2 — Road navigator（已完成）
+### M5.3 — Nearby mode（已完成）
 
 **Executor: ChatGPT**
 
-- [x] 新增 `getRoadNeighbors`，同一道路優先使用相同方向序列，再依里程排序。
-- [x] 缺少里程時以名稱／ID 穩定排序，不因資料缺值失敗。
-- [x] 新增 `RoadCameraNavigator`，提供上一支／下一支與目前位置。
-- [x] 手機 Bottom Sheet 與桌面直播畫面均可沿線切換 Camera。
-- [x] 切換沿用既有選取 handler，同步最近觀看與 `camera=` URL。
+- [x] 新增 5 / 10 / 20 km 附近模式。
+- [x] 啟用後只顯示半徑內 Camera，並依距離由近到遠排序。
+- [x] 尚未取得定位時，選擇附近模式會主動觸發定位。
+- [x] 桌面與手機均有附近模式入口。
+- [x] URL 支援 `nearby=5|10|20`，分享／重開可恢復。
+- [x] 可與道路／類型／搜尋篩選疊加使用。
+- [x] GitHub Actions run `34704517553`：Install dependencies 與 Build 均成功。
+
+### M5.2 — Road navigator（已完成）
+
+- [x] 同道路優先同方向序列，再依里程排序。
+- [x] 手機 Bottom Sheet 與桌面直播畫面提供上一支／下一支。
+- [x] 切換同步最近觀看與 `camera=` URL。
 - [x] GitHub Actions run `34704427438` Build step 成功。
 
 ### M5.1 — Road grouping（已完成）
 
-**Executor: ChatGPT**
-
-- [x] 新增 `lib/roads.ts`，由 `roadNumber` / `road` / name 自動辨識道路編號。
-- [x] 自動建立道路群組與 Camera 數量。
-- [x] 新增 `RoadFilter`，桌面與手機皆可使用。
-- [x] 道路篩選同步作用於地圖與清單。
-- [x] URL 支援 `road=` 並可於重開時恢復。
+- [x] 自動辨識道路編號並建立道路群組與 Camera 數量。
+- [x] 桌面與手機皆可道路篩選。
+- [x] URL 支援 `road=` 並可恢復。
 - [x] GitHub Actions run `34704232348` 成功。
 
 ### M4 — 使用者功能（已完成）
@@ -71,29 +76,22 @@
 
 ## Milestones
 
-### M1 — 基礎整理與資料模型
-- [x] M1.1
-- [x] M1.2
-- [x] M1.3
+### V2 MVP — M1–M5
+- [x] M1 基礎整理與資料模型
+- [x] M2 UI 2.0
+- [x] M3 地圖效能
+- [x] M4 使用者功能
+- [x] M5 道路模式
 
-### M2 — UI 2.0
-- [x] M2.1
-- [x] M2.2
-- [x] M2.3
+### M6 — 即時交通事件
+- [ ] M6.1 TDX road-event foundation — **ChatGPT**
+- [ ] M6.2 Traffic event map overlay
+- [ ] M6.3 Event filters / Camera verification workflow
 
-### M3 — 地圖效能
-- [x] M3.1
-- [x] M3.2
-
-### M4 — 使用者功能
-- [x] M4.1 收藏
-- [x] M4.2 最近觀看
-- [x] M4.3 Share / URL state
-
-### M5 — 道路模式
-- [x] M5.1 Road grouping
-- [x] M5.2 Road navigator
-- [ ] M5.3 Nearby mode — **ChatGPT**
+### M7 — 路況判斷深化（暫定）
+- [ ] 壅塞／旅行速度或路況資訊 overlay
+- [ ] CMS / 即時資訊整合
+- [ ] 天氣／降雨與 CCTV 交叉判讀
 
 ---
 
