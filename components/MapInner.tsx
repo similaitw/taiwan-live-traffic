@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Camera } from '@/types/camera';
+import type { CmsDevice } from '@/types/cms';
 import type { TrafficEvent } from '@/types/traffic-event';
 import type { TrafficFlowMapSegment } from '@/types/traffic-flow';
 import { getDistance } from '@/lib/geo';
@@ -107,21 +108,21 @@ function congestionLabel(level?: number): string {
   return '極度壅塞';
 }
 
+function cmsStatusLabel(status?: number): string {
+  if (status === 0) return '設備正常';
+  if (status === 1) return '通訊異常';
+  if (status === 2) return '停用／施工';
+  if (status === 3) return '設備故障';
+  return '狀態未知';
+}
+
 function makeIcon(type: Camera['type']): L.DivIcon {
   const color = COLORS[type];
   return L.divIcon({
     className: '',
     html: `<svg width="24" height="32" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="glow-${type}" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2" result="blur"/>
-          <feFlood flood-color="${color}" flood-opacity="0.4" result="color"/>
-          <feComposite in="color" in2="blur" operator="in" result="glow"/>
-          <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-      <path d="M12 0C5.373 0 0 5.373 0 12c0 8 12 20 12 20S24 20 24 12C24 5.373 18.627 0 12 0z"
-        fill="${color}" stroke="rgba(255,255,255,0.3)" stroke-width="1" filter="url(#glow-${type})"/>
+      <defs><filter id="glow-${type}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="blur"/><feFlood flood-color="${color}" flood-opacity="0.4" result="color"/><feComposite in="color" in2="blur" operator="in" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 8 12 20 12 20S24 20 24 12C24 5.373 18.627 0 12 0z" fill="${color}" stroke="rgba(255,255,255,0.3)" stroke-width="1" filter="url(#glow-${type})"/>
       <circle cx="12" cy="12" r="4" fill="rgba(255,255,255,0.9)"/>
     </svg>`,
     iconSize: [24, 32],
@@ -152,19 +153,25 @@ function makeEventIcon(severity: TrafficEvent['severity']): L.DivIcon {
   });
 }
 
+function makeCmsIcon(status?: number): L.DivIcon {
+  const healthy = status === undefined || status === 0;
+  const color = healthy ? '#06b6d4' : '#f59e0b';
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:34px;height:25px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:${color};border:2px solid rgba(255,255,255,.82);box-shadow:0 0 0 5px ${color}22,0 7px 20px rgba(0,0,0,.42);color:white;font-weight:900;font-size:14px">≡</div>`,
+    iconSize: [34, 25],
+    iconAnchor: [17, 12],
+    popupAnchor: [0, -16],
+  });
+}
+
 function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraCluster[] {
   if (zoom >= 15) {
-    return cameras.map((camera) => ({
-      key: `camera:${camera.id}`,
-      cameras: [camera],
-      lat: camera.lat,
-      lng: camera.lng,
-    }));
+    return cameras.map((camera) => ({ key: `camera:${camera.id}`, cameras: [camera], lat: camera.lat, lng: camera.lng }));
   }
 
   const cellSize = zoom <= 7 ? 110 : zoom <= 9 ? 90 : zoom <= 11 ? 72 : zoom <= 13 ? 56 : 42;
   const groups = new Map<string, { cameras: Camera[]; latSum: number; lngSum: number }>();
-
   for (const camera of cameras) {
     const point = map.project(L.latLng(camera.lat, camera.lng), zoom);
     const key = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
@@ -177,7 +184,6 @@ function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraClus
       groups.set(key, { cameras: [camera], latSum: camera.lat, lngSum: camera.lng });
     }
   }
-
   return [...groups.entries()].map(([gridKey, group]) => ({
     key: group.cameras.length === 1 ? `camera:${group.cameras[0]!.id}` : `cluster:${zoom}:${gridKey}`,
     cameras: group.cameras,
@@ -187,9 +193,7 @@ function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraClus
 }
 
 function clusterSignature(cluster: CameraCluster): string {
-  return cluster.cameras.length === 1
-    ? cluster.cameras[0]!.id
-    : cluster.cameras.map((camera) => camera.id).sort().join('|');
+  return cluster.cameras.length === 1 ? cluster.cameras[0]!.id : cluster.cameras.map((camera) => camera.id).sort().join('|');
 }
 
 function findNearestCamera(cameras: Camera[], lat: number, lng: number): NearestCamera | null {
@@ -203,12 +207,10 @@ function findNearestCamera(cameras: Camera[], lat: number, lng: number): Nearest
 
 function verificationBlock(nearest: NearestCamera | null, onVerify: (camera: Camera) => void): HTMLElement | null {
   if (!nearest || nearest.distance > 15_000) return null;
-
   const verifier = document.createElement('div');
   verifier.style.marginTop = '10px';
   verifier.style.paddingTop = '8px';
   verifier.style.borderTop = '1px solid rgba(255,255,255,0.08)';
-
   const info = document.createElement('div');
   info.textContent = `最近可見 CCTV：${nearest.camera.name} · ${formatDistance(nearest.distance)}`;
   info.style.fontSize = '10px';
@@ -216,7 +218,6 @@ function verificationBlock(nearest: NearestCamera | null, onVerify: (camera: Cam
   info.style.color = '#9ca3af';
   info.style.marginBottom = '7px';
   verifier.appendChild(info);
-
   const button = document.createElement('button');
   button.type = 'button';
   button.textContent = '查看最近監視器';
@@ -238,6 +239,10 @@ function eventSignature(event: TrafficEvent, nearest: NearestCamera | null): str
   return [event.id, event.severity, event.lat, event.lng, event.title, event.description, event.publishTime, nearest?.camera.id, nearest ? Math.round(nearest.distance) : undefined].join('|');
 }
 
+function cmsSignature(device: CmsDevice, nearest: NearestCamera | null): string {
+  return [device.id, device.status, device.messageStatus, device.messages.join('||'), device.dataCollectTime, nearest?.camera.id, nearest ? Math.round(nearest.distance) : undefined].join('|');
+}
+
 function flowAnchor(segment: TrafficFlowMapSegment): [number, number] | null {
   const path = segment.paths.reduce((longest, current) => current.length > longest.length ? current : longest, segment.paths[0] ?? []);
   if (!path.length) return null;
@@ -255,6 +260,7 @@ interface Props {
   userLocation?: { lat: number; lng: number } | null;
   trafficEvents?: TrafficEvent[];
   trafficFlowSegments?: TrafficFlowMapSegment[];
+  cmsDevices?: CmsDevice[];
 }
 
 export default function MapInner({
@@ -264,17 +270,21 @@ export default function MapInner({
   userLocation,
   trafficEvents = [],
   trafficFlowSegments = [],
+  cmsDevices = [],
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const cameraLayerRef = useRef<L.LayerGroup | null>(null);
+  const cmsLayerRef = useRef<L.LayerGroup | null>(null);
   const eventLayerRef = useRef<L.LayerGroup | null>(null);
   const flowLayerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const renderedMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
+  const renderedCmsRef = useRef<Map<string, RenderedMarker>>(new Map());
   const renderedEventMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
   const renderedFlowRef = useRef<Map<string, RenderedFlow>>(new Map());
   const cameraFrameRef = useRef<number | null>(null);
+  const cmsFrameRef = useRef<number | null>(null);
   const eventFrameRef = useRef<number | null>(null);
   const flowFrameRef = useRef<number | null>(null);
 
@@ -282,22 +292,23 @@ export default function MapInner({
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current).setView([23.9, 121.0], 8);
     mapRef.current = map;
-
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 19,
       subdomains: 'abcd',
     }).addTo(map);
-
     flowLayerRef.current = L.layerGroup().addTo(map);
     cameraLayerRef.current = L.layerGroup().addTo(map);
+    cmsLayerRef.current = L.layerGroup().addTo(map);
     eventLayerRef.current = L.layerGroup().addTo(map);
 
     return () => {
       if (cameraFrameRef.current !== null) cancelAnimationFrame(cameraFrameRef.current);
+      if (cmsFrameRef.current !== null) cancelAnimationFrame(cmsFrameRef.current);
       if (eventFrameRef.current !== null) cancelAnimationFrame(eventFrameRef.current);
       if (flowFrameRef.current !== null) cancelAnimationFrame(flowFrameRef.current);
       renderedMarkersRef.current.clear();
+      renderedCmsRef.current.clear();
       renderedEventMarkersRef.current.clear();
       renderedFlowRef.current.clear();
       map.remove();
@@ -309,14 +320,12 @@ export default function MapInner({
     const map = mapRef.current;
     if (!map || !userLocation) return;
     if (userMarkerRef.current) map.removeLayer(userMarkerRef.current);
-
     const userIcon = L.divIcon({
       className: '',
       html: `<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="rgba(59,130,246,.15)" stroke="rgba(59,130,246,.3)"/><circle cx="14" cy="14" r="6" fill="#3b82f6" stroke="rgba(255,255,255,.6)" stroke-width="2"/><circle cx="14" cy="14" r="2" fill="white"/></svg>`,
       iconSize: [28, 28],
       iconAnchor: [14, 14],
     });
-
     userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 2000 }).addTo(map);
     map.setView([userLocation.lat, userLocation.lng], 12, { animate: true });
   }, [userLocation]);
@@ -348,24 +357,19 @@ export default function MapInner({
       const zoom = map.getZoom();
       const clusters = clusterCameras(map, visible, zoom);
       const next = new Set<string>();
-
       for (const cluster of clusters) {
         const signature = clusterSignature(cluster);
         next.add(cluster.key);
         const existing = renderedMarkersRef.current.get(cluster.key);
         if (existing?.signature === signature) continue;
         if (existing) layer.removeLayer(existing.marker);
-
         const marker = cluster.cameras.length > 1
           ? L.marker([cluster.lat, cluster.lng], { icon: makeClusterIcon(cluster.cameras.length), zIndexOffset: 800, title: `${cluster.cameras.length} 支監視器` })
           : createCameraMarker(cluster.cameras[0]!);
-        if (cluster.cameras.length > 1) {
-          marker.on('click', () => map.setView([cluster.lat, cluster.lng], Math.min(zoom + 2, 16), { animate: true, duration: 0.6 }));
-        }
+        if (cluster.cameras.length > 1) marker.on('click', () => map.setView([cluster.lat, cluster.lng], Math.min(zoom + 2, 16), { animate: true, duration: 0.6 }));
         marker.addTo(layer);
         renderedMarkersRef.current.set(cluster.key, { marker, signature });
       }
-
       for (const [key, rendered] of renderedMarkersRef.current) {
         if (!next.has(key)) {
           layer.removeLayer(rendered.marker);
@@ -387,6 +391,123 @@ export default function MapInner({
       if (cameraFrameRef.current !== null) cancelAnimationFrame(cameraFrameRef.current);
     };
   }, [cameras, query, onSelect]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const layer = cmsLayerRef.current;
+    if (!map || !layer) return;
+
+    const createPopup = (device: CmsDevice, nearest: NearestCamera | null): HTMLElement => {
+      const root = document.createElement('div');
+      root.style.width = '240px';
+      root.style.fontFamily = "'Noto Sans TC',sans-serif";
+
+      const heading = document.createElement('div');
+      heading.style.display = 'flex';
+      heading.style.alignItems = 'center';
+      heading.style.gap = '6px';
+      heading.style.marginBottom = '8px';
+      const badge = document.createElement('span');
+      badge.textContent = '官方看板';
+      badge.style.fontSize = '10px';
+      badge.style.fontWeight = '800';
+      badge.style.color = '#22d3ee';
+      badge.style.border = '1px solid rgba(34,211,238,.45)';
+      badge.style.background = 'rgba(6,182,212,.13)';
+      badge.style.padding = '2px 7px';
+      badge.style.borderRadius = '9999px';
+      heading.appendChild(badge);
+      const status = document.createElement('span');
+      status.textContent = cmsStatusLabel(device.status);
+      status.style.fontSize = '10px';
+      status.style.color = device.status === 0 || device.status === undefined ? '#10b981' : '#f59e0b';
+      heading.appendChild(status);
+      root.appendChild(heading);
+
+      const road = document.createElement('div');
+      road.textContent = `${device.roadName ?? device.roadId ?? '高速公路'}${device.roadDirection ? ` · ${device.roadDirection}` : ''}`;
+      road.style.fontSize = '12px';
+      road.style.fontWeight = '800';
+      road.style.color = '#e8ecf4';
+      road.style.marginBottom = '8px';
+      root.appendChild(road);
+
+      const messageBox = document.createElement('div');
+      messageBox.style.display = 'flex';
+      messageBox.style.flexDirection = 'column';
+      messageBox.style.gap = '5px';
+      for (const message of device.messages) {
+        const line = document.createElement('div');
+        line.textContent = message;
+        line.style.fontSize = '12px';
+        line.style.lineHeight = '1.55';
+        line.style.padding = '7px 8px';
+        line.style.borderRadius = '8px';
+        line.style.background = 'rgba(6,182,212,.08)';
+        line.style.border = '1px solid rgba(34,211,238,.16)';
+        line.style.color = '#cffafe';
+        messageBox.appendChild(line);
+      }
+      root.appendChild(messageBox);
+
+      const time = formatTime(device.dataCollectTime);
+      if (time) {
+        const meta = document.createElement('div');
+        meta.textContent = `資料 ${time}`;
+        meta.style.fontSize = '10px';
+        meta.style.color = '#6b7280';
+        meta.style.marginTop = '7px';
+        root.appendChild(meta);
+      }
+
+      const verify = verificationBlock(nearest, (camera) => { map.closePopup(); onSelect(camera); });
+      if (verify) root.appendChild(verify);
+      return root;
+    };
+
+    const render = () => {
+      const bounds = map.getBounds().pad(0.35);
+      const visible = cmsDevices.filter((device) => typeof device.lat === 'number' && typeof device.lng === 'number' && Number.isFinite(device.lat) && Number.isFinite(device.lng) && bounds.contains([device.lat, device.lng]));
+      const next = new Set<string>();
+      for (const device of visible) {
+        const nearest = findNearestCamera(cameras, device.lat!, device.lng!);
+        const key = `cms:${device.id}`;
+        const signature = cmsSignature(device, nearest);
+        next.add(key);
+        const existing = renderedCmsRef.current.get(key);
+        if (existing?.signature === signature) continue;
+        if (existing) layer.removeLayer(existing.marker);
+        const marker = L.marker([device.lat!, device.lng!], {
+          icon: makeCmsIcon(device.status),
+          zIndexOffset: 1350,
+          keyboard: true,
+          title: device.messages[0] ?? '官方資訊看板',
+        });
+        marker.bindPopup(createPopup(device, nearest), { maxWidth: 275, className: 'leaflet-camera-preview' });
+        marker.addTo(layer);
+        renderedCmsRef.current.set(key, { marker, signature });
+      }
+      for (const [key, rendered] of renderedCmsRef.current) {
+        if (!next.has(key)) {
+          layer.removeLayer(rendered.marker);
+          renderedCmsRef.current.delete(key);
+        }
+      }
+    };
+
+    const schedule = () => {
+      if (cmsFrameRef.current !== null) cancelAnimationFrame(cmsFrameRef.current);
+      cmsFrameRef.current = requestAnimationFrame(() => { cmsFrameRef.current = null; render(); });
+    };
+    schedule();
+    map.on('moveend', schedule);
+    map.on('zoomend', schedule);
+    return () => {
+      map.off('moveend', schedule);
+      map.off('zoomend', schedule);
+      if (cmsFrameRef.current !== null) cancelAnimationFrame(cmsFrameRef.current);
+    };
+  }, [cameras, cmsDevices, onSelect]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -458,7 +579,6 @@ export default function MapInner({
       const speed = segment.travelSpeed !== undefined ? `${Math.round(segment.travelSpeed)} km/h` : '—';
       const travel = formatTravelTime(segment.travelTime) ?? '—';
       const collected = formatTime(segment.dataCollectTime);
-
       root.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:10px;font-weight:800;color:${color};border:1px solid ${color}66;background:${color}18;padding:2px 7px;border-radius:9999px">${congestionLabel(segment.congestionLevel)}</span><span style="font-size:10px;color:#6b7280">TDX 即時路況</span></div><div style="font-size:13px;font-weight:800;color:#e8ecf4;line-height:1.45;margin-bottom:5px">${escapeHtml(title)}</div>${sectionDetail && sectionDetail !== title ? `<div style="font-size:11px;color:#9ca3af;margin-bottom:8px">${escapeHtml(sectionDetail)}${segment.roadDirection ? ` · ${escapeHtml(segment.roadDirection)}` : ''}</div>` : ''}<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:7px"><div style="padding:7px;border-radius:8px;background:rgba(255,255,255,.04)"><div style="font-size:9px;color:#6b7280">平均速度</div><div style="font-size:13px;font-weight:800;color:#e8ecf4">${speed}</div></div><div style="padding:7px;border-radius:8px;background:rgba(255,255,255,.04)"><div style="font-size:9px;color:#6b7280">旅行時間</div><div style="font-size:13px;font-weight:800;color:#e8ecf4">${travel}</div></div></div>${collected ? `<div style="font-size:10px;color:#6b7280">資料 ${escapeHtml(collected)}</div>` : ''}`;
       const verify = verificationBlock(nearest, (camera) => { map.closePopup(); onSelect(camera); });
       if (verify) root.appendChild(verify);
@@ -469,7 +589,6 @@ export default function MapInner({
       const bounds = map.getBounds().pad(0.35);
       const visible = trafficFlowSegments.filter((segment) => segment.paths.some((path) => path.length >= 2 && bounds.intersects(L.latLngBounds(path))));
       const next = new Set<string>();
-
       for (const segment of visible) {
         const anchor = flowAnchor(segment);
         const nearest = anchor ? findNearestCamera(cameras, anchor[0], anchor[1]) : null;
@@ -479,7 +598,6 @@ export default function MapInner({
         const existing = renderedFlowRef.current.get(key);
         if (existing?.signature === signature) continue;
         if (existing) layer.removeLayer(existing.polyline);
-
         const color = congestionColor(segment.congestionLevel);
         const polyline = L.polyline(segment.paths, {
           color,
@@ -490,12 +608,11 @@ export default function MapInner({
           interactive: true,
         });
         polyline.bindPopup(createPopup(segment, nearest), { maxWidth: 270, className: 'leaflet-camera-preview' });
-        polyline.on('mouseover', () => polyline.setStyle({ weight: ((segment.congestionLevel ?? 0) >= 3 ? 9 : 7), opacity: 1 }));
-        polyline.on('mouseout', () => polyline.setStyle({ weight: ((segment.congestionLevel ?? 0) >= 3 ? 7 : 5), opacity: segment.congestionLevel === -99 || segment.congestionLevel === 0 ? 0.5 : 0.82 }));
+        polyline.on('mouseover', () => polyline.setStyle({ weight: (segment.congestionLevel ?? 0) >= 3 ? 9 : 7, opacity: 1 }));
+        polyline.on('mouseout', () => polyline.setStyle({ weight: (segment.congestionLevel ?? 0) >= 3 ? 7 : 5, opacity: segment.congestionLevel === -99 || segment.congestionLevel === 0 ? 0.5 : 0.82 }));
         polyline.addTo(layer);
         renderedFlowRef.current.set(key, { polyline, signature });
       }
-
       for (const [key, rendered] of renderedFlowRef.current) {
         if (!next.has(key)) {
           layer.removeLayer(rendered.polyline);
