@@ -164,6 +164,14 @@ function lookupKeys(item: { id: string; cmsId?: string; cmsUid?: string }): stri
   return [...new Set([item.id, item.cmsUid, item.cmsId].filter((value): value is string => Boolean(value)))];
 }
 
+function findByKeys<T>(lookup: Map<string, T>, keys: string[]): T | undefined {
+  for (const key of keys) {
+    const value = lookup.get(key);
+    if (value) return value;
+  }
+  return undefined;
+}
+
 export function joinCmsDevices(staticRecords: CmsStaticRecord[], liveRecords: CmsLiveRecord[]): CmsDevice[] {
   const staticLookup = new Map<string, CmsStaticRecord>();
   const liveLookup = new Map<string, CmsLiveRecord>();
@@ -175,24 +183,29 @@ export function joinCmsDevices(staticRecords: CmsStaticRecord[], liveRecords: Cm
     for (const key of lookupKeys(item)) liveLookup.set(key, item);
   }
 
-  const canonicalIds = new Set([
-    ...staticRecords.map((item) => item.id),
-    ...liveRecords.map((item) => item.id),
-  ]);
+  const devices = new Map<string, CmsDevice>();
+  const seeds: Array<CmsStaticRecord | CmsLiveRecord> = [...staticRecords, ...liveRecords];
 
-  return [...canonicalIds].map((id): CmsDevice => {
-    const staticRecord = staticLookup.get(id);
-    const liveRecord = liveLookup.get(id)
-      ?? (staticRecord?.cmsUid ? liveLookup.get(staticRecord.cmsUid) : undefined)
-      ?? (staticRecord?.cmsId ? liveLookup.get(staticRecord.cmsId) : undefined);
-    const resolvedStatic = staticRecord
-      ?? (liveRecord?.cmsUid ? staticLookup.get(liveRecord.cmsUid) : undefined)
-      ?? (liveRecord?.cmsId ? staticLookup.get(liveRecord.cmsId) : undefined);
+  for (const seed of seeds) {
+    const keys = lookupKeys(seed);
+    const staticRecord = findByKeys(staticLookup, keys);
+    const liveRecord = findByKeys(liveLookup, [
+      ...keys,
+      ...(staticRecord ? lookupKeys(staticRecord) : []),
+    ]);
+    const resolvedStatic = staticRecord ?? (liveRecord ? findByKeys(staticLookup, lookupKeys(liveRecord)) : undefined);
+    const canonicalId = resolvedStatic?.cmsUid
+      ?? liveRecord?.cmsUid
+      ?? resolvedStatic?.cmsId
+      ?? liveRecord?.cmsId
+      ?? seed.id;
+
+    if (devices.has(canonicalId)) continue;
+
     const messages = liveRecord?.messages ?? [];
     const messageStatus = liveRecord?.messageStatus;
-
-    return {
-      id: resolvedStatic?.cmsUid ?? liveRecord?.cmsUid ?? resolvedStatic?.cmsId ?? liveRecord?.cmsId ?? id,
+    devices.set(canonicalId, {
+      id: canonicalId,
       cmsId: resolvedStatic?.cmsId ?? liveRecord?.cmsId,
       cmsUid: resolvedStatic?.cmsUid ?? liveRecord?.cmsUid,
       lat: resolvedStatic?.lat,
@@ -208,8 +221,10 @@ export function joinCmsDevices(staticRecords: CmsStaticRecord[], liveRecords: Cm
       dataCollectTime: liveRecord?.dataCollectTime,
       active: messageStatus === 1 && messages.length > 0,
       source: 'tdx',
-    };
-  });
+    });
+  }
+
+  return [...devices.values()];
 }
 
 async function fetchJson(url: string): Promise<unknown> {
