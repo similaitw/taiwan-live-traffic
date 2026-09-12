@@ -6,37 +6,32 @@
 
 ## Current task
 
-### M8.2 — CMS map overlay / Camera verification
+### M9.1 — CWA rainfall observation foundation
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] `Map` 獨立讀取 `/api/cms`，不得影響 Camera／事件／壅塞資料載入。
-- [ ] TDX CMS 啟用時顯示「官方看板」切換；預設 overlay 僅顯示 `active=true` 且有座標的 CMS。
-- [ ] `MapInner` 新增獨立 CMS Leaflet layer，不混進 Camera clustering、事件 marker 或壅塞 polyline。
-- [ ] CMS marker 視覺需與 Camera／事件清楚區分。
-- [ ] popup 顯示道路／方向、看板訊息、設備狀態、資料時間。
-- [ ] popup 尋找 15 km 內最近 Camera，顯示距離並提供「查看最近監視器」。
-- [ ] CMS 無座標、資料不完整或來源 partial 時不得造成地圖錯誤。
+- [ ] 新增 CWA 雨量觀測 normalized model。
+- [ ] 串接中央氣象署 `O-A0002-001` 雨量觀測站資料，授權碼只留在 server-side。
+- [ ] 正規化 StationId / StationName / lat / lng / County / Town / observation time。
+- [ ] 正規化 10min / 1hr / 3hr / 6hr / 12hr / 24hr / daily accumulated rainfall；缺值與負值視為 unavailable，不當成 0。
+- [ ] parser 對 CWA JSON envelope 與欄位大小寫保持寬鬆相容。
+- [ ] 新增 `/api/rainfall`，快取約 10 分鐘。
+- [ ] 新增 `CWA_API_KEY` 環境變數範本；未設定或上游失敗時 graceful degradation，不影響 Camera / TDX 功能。
+- [ ] 本任務不渲染地圖；雷達與站點 overlay 留給 M9.2。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M8.3 — CMS filtering / road workflow。
+完成後將 Current task 更新成 M9.2 — Rainfall / radar map overlay。
 
 ---
 
 ## 已完成任務
 
-### M8.1 — CMS foundation（已完成）
-
-- [x] 串接 TDX CMS 靜態 `/Road/Traffic/CMS/Freeway` 與動態 `/Road/Traffic/Live/CMS/Freeway`。
-- [x] 以 CMSUID 優先、CMSID fallback 合併靜態與動態資料並去重。
-- [x] 靜態正規化座標／Link／道路欄位；動態正規化 MessageStatus／Messages／Status／DataCollectTime。
-- [x] 兼容舊版 `Text` 與新版 `Messages`。
-- [x] `/api/cms`：靜態 6 小時 cache、動態 2 分鐘 cache。
-- [x] 輸出 `active` 供 UI 判斷目前是否有循環訊息。
-- [x] 支援 disabled / partial / error graceful degradation。
-- [x] GitHub Actions run `34705565204` 成功。
+### M8 — CMS / 官方即時提醒（已完成）
+- [x] M8.1 CMS foundation — CI `34705565204`
+- [x] M8.2 CMS map overlay / Camera verification — CI `34705688422`
+- [x] M8.3 CMS filtering / road workflow — CI `34705864679`
 
 ### M7 — 壅塞／旅行速度（已完成）
 - [x] M7.1 Freeway live traffic foundation — CI `34705057134`
@@ -90,12 +85,14 @@
 - [x] M7.3
 
 ### M8 — CMS / 官方即時提醒
-- [x] M8.1 CMS foundation
-- [ ] M8.2 CMS map overlay / Camera verification — **ChatGPT**
-- [ ] M8.3 CMS filtering / road workflow
+- [x] M8.1
+- [x] M8.2
+- [x] M8.3
 
-### M9 — 天氣／降雨（暫定）
-- [ ] 降雨／雷達與 CCTV 交叉判讀
+### M9 — 天氣／降雨
+- [ ] M9.1 CWA rainfall observation foundation — **ChatGPT**
+- [ ] M9.2 Rainfall / radar map overlay
+- [ ] M9.3 Rainfall / CCTV cross-check workflow
 
 ---
 
