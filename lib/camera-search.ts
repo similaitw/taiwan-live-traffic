@@ -37,7 +37,7 @@ function compact(value: string): string {
 }
 
 function trimNumber(value: number, digits = 3): string {
-  return value.toFixed(digits).replace(/\.0+$|(?<=\.[0-9]*?)0+$/g, '').replace(/\.$/, '');
+  return value.toFixed(digits).replace(/\.?0+$/, '');
 }
 
 function parseMile(value: Camera['mile']): number | undefined {
