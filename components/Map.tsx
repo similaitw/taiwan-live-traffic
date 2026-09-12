@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import type { Camera } from '@/types/camera';
+import type { CmsDevice, CmsResponse } from '@/types/cms';
 import type { TrafficEvent, TrafficEventsResponse } from '@/types/traffic-event';
 import type { TrafficFlowMapSegment, TrafficFlowResponse } from '@/types/traffic-flow';
 import type { TrafficSectionsResponse } from '@/types/traffic-section';
@@ -30,6 +31,10 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   const [flowEnabled, setFlowEnabled] = useState(false);
   const [showTrafficFlow, setShowTrafficFlow] = useState(true);
   const [flowFilter, setFlowFilter] = useState<FlowFilter>('all');
+
+  const [cmsDevices, setCmsDevices] = useState<CmsDevice[]>([]);
+  const [cmsEnabled, setCmsEnabled] = useState(false);
+  const [showCms, setShowCms] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +88,30 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch('/api/cms')
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json() as Promise<CmsResponse>;
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setCmsEnabled(payload.enabled);
+        setCmsDevices(payload.enabled ? payload.devices : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCmsEnabled(false);
+        setCmsDevices([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const filteredTrafficEvents = useMemo(() => {
     if (eventFilter === 'serious') {
       return trafficEvents.filter((event) => event.severity === 'serious');
@@ -125,6 +154,11 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
     return congestionSegments;
   }, [congestionSegments, flowFilter]);
 
+  const activeCmsDevices = useMemo(
+    () => cmsDevices.filter((device) => device.active && typeof device.lat === 'number' && typeof device.lng === 'number'),
+    [cmsDevices],
+  );
+
   return (
     <div
       className="relative w-full h-full overflow-hidden rounded-none md:rounded-xl"
@@ -140,10 +174,28 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         userLocation={userLocation}
         trafficEvents={showTrafficEvents ? filteredTrafficEvents : []}
         trafficFlowSegments={showTrafficFlow ? filteredCongestionSegments : []}
+        cmsDevices={showCms ? activeCmsDevices : []}
       />
 
-      {(trafficEnabled || flowEnabled) && (
+      {(trafficEnabled || flowEnabled || cmsEnabled) && (
         <div className="absolute right-3 bottom-16 md:bottom-auto md:top-3 z-[900] flex flex-col items-end gap-2">
+          {cmsEnabled && (
+            <button
+              type="button"
+              onClick={() => setShowCms((value) => !value)}
+              className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all"
+              style={{
+                background: showCms ? 'rgba(6,182,212,0.92)' : 'rgba(10,14,26,0.86)',
+                color: '#fff',
+                border: `1px solid ${showCms ? 'rgba(34,211,238,0.9)' : 'var(--border-subtle)'}`,
+                boxShadow: '0 8px 22px rgba(0,0,0,0.3)',
+              }}
+              aria-pressed={showCms}
+            >
+              📢 官方看板 {activeCmsDevices.length}
+            </button>
+          )}
+
           {flowEnabled && (
             <div className="flex items-center gap-2">
               {showTrafficFlow && congestionSegments.length > 0 && (
