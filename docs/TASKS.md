@@ -6,51 +6,40 @@
 
 ## Current task
 
-### M5.1 — Road grouping
+### M5.2 — Road navigator
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 從 Camera V2 `roadNumber` / `road` 自動建立道路群組與 Camera 數量。
-- [ ] 至少能穩定辨識國道與主要省道，例如國1、國3、國5、台2、台7、台9。
-- [ ] 桌面與手機提供道路篩選入口。
-- [ ] 選定道路後，地圖與清單只顯示該道路 Camera。
-- [ ] URL 支援 `road=<道路編號>`，分享／重開可恢復道路篩選。
-- [ ] 不在本任務做上一支／下一支；留給 M5.2。
+- [ ] 同一道路 Camera 優先依方向分組，再依 `mile` 由小到大排序。
+- [ ] Camera 詳細資訊提供「上一支／下一支」沿線導航。
+- [ ] 手機 Bottom Sheet 與桌面直播畫面都可切換沿線 Camera。
+- [ ] 切換 Camera 時同步更新最近觀看與 `camera=` URL。
+- [ ] 無法判斷里程時保持穩定排序，不因缺值崩潰。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M5.2 — Road navigator。
+完成後將 Current task 更新成 M5.3 — Nearby mode。
 
 ---
 
 ## 已完成任務
 
-### M4.3 — Share / URL state（已完成）
+### M5.1 — Road grouping（已完成）
 
 **Executor: ChatGPT**
 
-- [x] URL 同步 `q`、`type`、`camera`，使用 `history.replaceState`，不重載頁面。
-- [x] 分享網址重開後恢復搜尋／類型，Camera 資料載入後恢復選取。
-- [x] Camera 關閉時移除 `camera` query parameter。
-- [x] 新增共用 `CameraShareButton`；支援 Web Share API 與複製網址 fallback。
-- [x] 手機 Bottom Sheet 與桌面直播 overlay 都提供分享入口。
-- [x] GitHub Actions run `34704132752` Build step 成功。
+- [x] 新增 `lib/roads.ts`，由 `roadNumber` / `road` / name 自動辨識道路編號。
+- [x] 自動建立道路群組與 Camera 數量，國道、省道、縣道、鄉道依類型／號碼排序。
+- [x] 新增共用 `RoadFilter`，桌面與手機皆可使用。
+- [x] 道路篩選同步作用於地圖與清單。
+- [x] URL 支援 `road=` 並可於重開時恢復。
+- [x] GitHub Actions run `34704232348` 成功。
 
-### M4.2 — 最近觀看（已完成）
-
-- [x] 最近觀看最多 20 支，localStorage 持久化。
-- [x] 手機／桌面開啟 Camera 詳細資訊時記錄。
-- [x] 新增「最近」快速篩選並依最近順序排列。
-- [x] 「收藏」與「最近」互斥。
-- [x] CI run `34704005838` 成功。
-
-### M4.1 — 收藏（已完成）
-
-- [x] CameraCard / Bottom Sheet 收藏。
-- [x] 桌面與手機「只看收藏」。
-- [x] 移除 CameraCard 假 LIVE 紅點。
-- [x] CI run `34703855243` 成功。
+### M4 — 使用者功能（已完成）
+- [x] M4.1 收藏 — CI `34703855243`
+- [x] M4.2 最近觀看 — CI `34704005838`
+- [x] M4.3 Share / URL state — CI `34704132752`
 
 ### M3 — 地圖效能（已完成）
 - [x] M3.1 Marker clustering — CI `34703638881`
@@ -90,8 +79,8 @@
 - [x] M4.3 Share / URL state
 
 ### M5 — 道路模式
-- [ ] M5.1 Road grouping — **ChatGPT**
-- [ ] M5.2 Road navigator
+- [x] M5.1 Road grouping — **ChatGPT**
+- [ ] M5.2 Road navigator — **ChatGPT**
 - [ ] M5.3 Nearby mode
 
 ---
