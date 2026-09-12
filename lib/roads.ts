@@ -6,6 +6,15 @@ export interface RoadGroup {
   cameras: Camera[];
 }
 
+export interface RoadNeighbors {
+  roadNumber?: string;
+  direction?: string;
+  previous?: Camera;
+  next?: Camera;
+  position: number;
+  total: number;
+}
+
 const ROAD_PATTERN = /(?:國|台|縣道|鄉道)\d+(?:甲|乙|丙|丁)?/;
 
 export function getCameraRoadNumber(camera: Camera): string | undefined {
@@ -39,6 +48,56 @@ function roadSortKey(roadNumber: string): [number, number, number] {
         : roadNumber.endsWith('丁') ? 4
           : 0;
   return [prefix, number, branch];
+}
+
+function mileValue(camera: Camera): number {
+  if (typeof camera.mile === 'number') {
+    return Number.isFinite(camera.mile) ? camera.mile : Number.POSITIVE_INFINITY;
+  }
+
+  const text = camera.mile == null ? '' : String(camera.mile).trim();
+  const stake = text.match(/(\d+)\s*[kK]?\s*\+\s*(\d{1,3})/);
+  if (stake) return Number(stake[1]) + Number(stake[2]) / 1000;
+
+  const decimal = text.match(/\d+(?:\.\d+)?/);
+  return decimal ? Number(decimal[0]) : Number.POSITIVE_INFINITY;
+}
+
+function sortRoadCameras(cameras: Camera[]): Camera[] {
+  return [...cameras].sort((a, b) => {
+    const mileDifference = mileValue(a) - mileValue(b);
+    if (Number.isFinite(mileDifference) && mileDifference !== 0) return mileDifference;
+    if (Number.isFinite(mileValue(a)) !== Number.isFinite(mileValue(b))) {
+      return Number.isFinite(mileValue(a)) ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name, 'zh-Hant', { numeric: true }) || a.id.localeCompare(b.id);
+  });
+}
+
+export function getRoadNeighbors(cameras: Camera[], camera: Camera): RoadNeighbors {
+  const roadNumber = getCameraRoadNumber(camera);
+  if (!roadNumber) return { position: 0, total: 0 };
+
+  const sameRoad = cameras.filter((item) => getCameraRoadNumber(item) === roadNumber);
+  const direction = camera.direction?.trim() || undefined;
+  const sameDirection = direction
+    ? sameRoad.filter((item) => item.direction?.trim() === direction)
+    : [];
+  const sequence = sortRoadCameras(sameDirection.length > 1 ? sameDirection : sameRoad);
+  const index = sequence.findIndex((item) => item.id === camera.id);
+
+  if (index < 0) {
+    return { roadNumber, direction, position: 0, total: sequence.length };
+  }
+
+  return {
+    roadNumber,
+    direction,
+    previous: index > 0 ? sequence[index - 1] : undefined,
+    next: index < sequence.length - 1 ? sequence[index + 1] : undefined,
+    position: index + 1,
+    total: sequence.length,
+  };
 }
 
 export function groupCamerasByRoad(cameras: Camera[]): RoadGroup[] {
