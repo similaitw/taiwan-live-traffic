@@ -6,42 +6,32 @@
 
 ## Current task
 
-### M9.3 — Rainfall / CCTV cross-check workflow
+### M10.1 — Unified map layer controls
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 雨量站 popup 尋找距離最近的目前可見 Camera。
-- [ ] 15 km 內才顯示 Camera 名稱、距離與「查看附近監視器」操作；不得暗示測站與 CCTV 位於同一點。
-- [ ] 點擊驗證按鈕沿用既有 Camera `onSelect`，手機開 Bottom Sheet、桌面進既有詳細／直播流程。
-- [ ] popup 保留雨量數據與觀測時間，明確呈現「測站數值 + 附近現場影像」兩種不同證據。
-- [ ] 沒有合理距離 CCTV 時不顯示驗證按鈕。
-- [ ] Rainfall 不混入 Camera 收藏、最近觀看或 Camera clustering。
-- [ ] 雷達 overlay、雨量站 filter、TDX/CMS layers 需維持既有行為。
+- [ ] 把雷達、雨量、CMS、即時路況、交通事件從多排浮動控制整理成單一「圖層」入口。
+- [ ] 新增獨立 `MapLayerControls` 元件，`Map` 保留資料／狀態管理，不把 Leaflet 邏輯搬進控制元件。
+- [ ] 面板顯示各圖層開關、目前筆數與既有 filter；功能語意與資料來源不得改變。
+- [ ] TDX 未設定時只隱藏不可用圖層，不影響 CWA 雷達／雨量與 CCTV。
+- [ ] 行動版圖層入口不得遮住底部「地圖／清單」切換；面板需可捲動。
+- [ ] 桌面版保持右上角操作；面板收合時只保留一個低干擾按鈕。
+- [ ] `aria-expanded` / label / button semantics 完整。
+- [ ] 不在本任務改 Camera clustering、Bottom Sheet、API 或資料模型。
 - [ ] GitHub Actions CI build 通過。
 
-完成後 M9 天氣／降雨階段結案。
+完成後將 Current task 更新成 M10.2 — Mobile layer-panel polish / visual validation。
 
 ---
 
 ## 已完成任務
 
-### M9.2 — Rainfall / radar map overlay（已完成）
-- [x] `Map` 獨立載入 `/api/rainfall`，不影響其他資料來源。
-- [x] CWA O-A0058-006 雷達透明圖層使用獨立 Leaflet pane。
-- [x] 雷達位於底圖上、壅塞與 marker layers 下方，並約每 10 分鐘刷新 URL。
-- [x] 雨量站採獨立 viewport/diff marker layer。
-- [x] 預設只顯示近 1 小時有雨測站，可切換全部測站。
-- [x] popup 顯示測站位置、時間與 10min / 1hr / 3hr / 24hr 雨量。
-- [x] 雨量 marker 強度僅供視覺辨識，不宣稱官方警戒門檻。
-- [x] GitHub Actions run `34708797685` 成功。
-
-### M9.1 — CWA rainfall observation foundation（已完成）
-- [x] CWA `O-A0002-001` normalized model / parser / `/api/rainfall`。
-- [x] 使用 CWA 官方管理的公開 AWS Open Data raw JSON，不需額外 API key。
-- [x] WGS84 優先、特殊雨量值不誤判為 0、10 分鐘 cache、graceful degradation。
-- [x] GitHub Actions run `34708540549` 成功。
+### M9 — 天氣／降雨（已完成）
+- [x] M9.1 CWA rainfall observation foundation — CI `34708540549`
+- [x] M9.2 Rainfall / radar map overlay — CI `34708797685`
+- [x] M9.3 Rainfall / CCTV cross-check workflow — CI `34708915050`
 
 ### M8 — CMS / 官方即時提醒（已完成）
 - [x] M8.1 CMS foundation — CI `34705565204`
@@ -105,9 +95,14 @@
 - [x] M8.3
 
 ### M9 — 天氣／降雨
-- [x] M9.1 CWA rainfall observation foundation
-- [x] M9.2 Rainfall / radar map overlay
-- [ ] M9.3 Rainfall / CCTV cross-check workflow — **ChatGPT**
+- [x] M9.1
+- [x] M9.2
+- [x] M9.3
+
+### M10 — 圖層控制與行動版整理
+- [ ] M10.1 Unified map layer controls — **ChatGPT**
+- [ ] M10.2 Mobile layer-panel polish / visual validation
+- [ ] M10.3 Layer preferences persistence（候選）
 
 ---
 
