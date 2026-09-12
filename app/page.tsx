@@ -8,7 +8,7 @@ import { getCameraRoadNumber, getRoadNeighbors, groupCamerasByRoad } from '@/lib
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useRecentCameras } from '@/hooks/useRecentCameras';
-import SearchBar from '@/components/SearchBar';
+import CameraSearchBar from '@/components/CameraSearchBar';
 import CameraList from '@/components/CameraList';
 import CameraModal from '@/components/CameraModal';
 import CameraBottomSheet from '@/components/CameraBottomSheet';
@@ -353,7 +353,14 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <SearchBar value={query} onChange={setQuery} placeholder="搜尋道路、地點、監視器…" />
+                <CameraSearchBar
+                  cameras={cameras}
+                  value={query}
+                  onChange={setQuery}
+                  onSelectRoad={setSelectedRoad}
+                  onSelectCamera={handleDesktopSelect}
+                  placeholder="搜尋道路、地點、監視器…"
+                />
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   {typeChips()}
@@ -424,7 +431,7 @@ export default function HomePage() {
             <section className="flex-1 min-w-0 h-full p-3">
               <Map
                 cameras={filteredCameras}
-                query={query}
+                query=""
                 onSelect={handleDesktopSelect}
                 userLocation={userLocation}
               />
@@ -434,7 +441,14 @@ export default function HomePage() {
           <div className="md:hidden h-full relative z-10">
             <div className="absolute inset-x-3 top-3 z-40">
               <div className="glass rounded-xl shadow-2xl p-1.5">
-                <SearchBar value={query} onChange={setQuery} placeholder="搜尋道路、地點、監視器…" />
+                <CameraSearchBar
+                  cameras={cameras}
+                  value={query}
+                  onChange={setQuery}
+                  onSelectRoad={setSelectedRoad}
+                  onSelectCamera={handleMobileSelect}
+                  placeholder="搜尋道路、地點、監視器…"
+                />
               </div>
             </div>
 
@@ -505,7 +519,7 @@ export default function HomePage() {
               <div className="h-full">
                 <Map
                   cameras={filteredCameras}
-                  query={query}
+                  query=""
                   onSelect={handleMobileSelect}
                   userLocation={userLocation}
                 />
