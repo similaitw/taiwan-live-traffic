@@ -96,7 +96,7 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   const congestionSegments = useMemo<TrafficFlowMapSegment[]>(() => {
     if (!trafficFlow?.enabled || !trafficSections?.enabled) return [];
 
-    const sectionById = new Map(
+    const sectionById = new globalThis.Map(
       trafficSections.sections.map((section) => [section.sectionId, section] as const),
     );
 
