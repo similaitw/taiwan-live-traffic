@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Camera } from '@/types/camera';
+import CameraShareButton from './CameraShareButton';
 
 const TYPE_LABEL: Record<Camera['type'], string> = {
   freeway: '國道',
@@ -102,6 +103,7 @@ export default function CameraBottomSheet({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <CameraShareButton camera={camera} compact />
             {onToggleFavorite && (
               <button
                 type="button"
