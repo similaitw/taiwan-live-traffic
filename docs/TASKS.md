@@ -6,29 +6,36 @@
 
 ## Current task
 
-### M9.2 — Rainfall / radar map overlay
+### M9.3 — Rainfall / CCTV cross-check workflow
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] `Map` 獨立讀取 `/api/rainfall`，不得影響 Camera / TDX / CMS 載入。
-- [ ] 新增 CWA `O-A0058-006` 雷達整合回波透明圖層，範圍 118–124E、20.5–26.5N。
-- [ ] 雷達使用獨立 Leaflet pane，位於底圖上、壅塞線段與所有 marker 下方。
-- [ ] 雷達可獨立開關，約每 10 分鐘刷新 URL，避免長時間顯示舊圖。
-- [ ] 雨量站使用獨立 marker layer，不混入 Camera clustering。
-- [ ] 預設僅顯示近 1 小時雨量 > 0 的測站，可切換顯示全部站。
-- [ ] 雨量 marker 依近 1 小時雨量採視覺強度區分，但不得宣稱為官方警戒門檻。
-- [ ] popup 顯示站名、縣市鄉鎮、觀測時間、10min / 1hr / 3hr / 24hr 雨量。
-- [ ] 無雨量、缺值、來源失敗或雷達圖載入失敗不得影響既有地圖。
-- [ ] 本任務不做 Rainfall → CCTV 驗證；留給 M9.3。
+- [ ] 雨量站 popup 尋找距離最近的目前可見 Camera。
+- [ ] 15 km 內才顯示 Camera 名稱、距離與「查看附近監視器」操作；不得暗示測站與 CCTV 位於同一點。
+- [ ] 點擊驗證按鈕沿用既有 Camera `onSelect`，手機開 Bottom Sheet、桌面進既有詳細／直播流程。
+- [ ] popup 保留雨量數據與觀測時間，明確呈現「測站數值 + 附近現場影像」兩種不同證據。
+- [ ] 沒有合理距離 CCTV 時不顯示驗證按鈕。
+- [ ] Rainfall 不混入 Camera 收藏、最近觀看或 Camera clustering。
+- [ ] 雷達 overlay、雨量站 filter、TDX/CMS layers 需維持既有行為。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M9.3 — Rainfall / CCTV cross-check workflow。
+完成後 M9 天氣／降雨階段結案。
 
 ---
 
 ## 已完成任務
+
+### M9.2 — Rainfall / radar map overlay（已完成）
+- [x] `Map` 獨立載入 `/api/rainfall`，不影響其他資料來源。
+- [x] CWA O-A0058-006 雷達透明圖層使用獨立 Leaflet pane。
+- [x] 雷達位於底圖上、壅塞與 marker layers 下方，並約每 10 分鐘刷新 URL。
+- [x] 雨量站採獨立 viewport/diff marker layer。
+- [x] 預設只顯示近 1 小時有雨測站，可切換全部測站。
+- [x] popup 顯示測站位置、時間與 10min / 1hr / 3hr / 24hr 雨量。
+- [x] 雨量 marker 強度僅供視覺辨識，不宣稱官方警戒門檻。
+- [x] GitHub Actions run `34708797685` 成功。
 
 ### M9.1 — CWA rainfall observation foundation（已完成）
 - [x] CWA `O-A0002-001` normalized model / parser / `/api/rainfall`。
@@ -99,11 +106,11 @@
 
 ### M9 — 天氣／降雨
 - [x] M9.1 CWA rainfall observation foundation
-- [ ] M9.2 Rainfall / radar map overlay — **ChatGPT**
-- [ ] M9.3 Rainfall / CCTV cross-check workflow
+- [x] M9.2 Rainfall / radar map overlay
+- [ ] M9.3 Rainfall / CCTV cross-check workflow — **ChatGPT**
 
 ---
 
 ## Executor 原則
 
-預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions 處理。
+預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions處理。
