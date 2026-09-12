@@ -6,44 +6,44 @@
 
 ## Current task
 
-### M6.3 — Event filters / Camera verification workflow
+### M7.1 — Freeway live traffic foundation
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 交通事件 overlay 提供「全部／警示以上／嚴重」篩選，不影響 Camera 篩選。
-- [ ] 事件 marker popup 找出距離最近的 Camera；合理距離內提供「查看最近監視器」操作。
-- [ ] 點「查看最近監視器」沿用既有 Camera `onSelect`，手機開 Bottom Sheet、桌面開詳細直播流程。
-- [ ] popup 顯示最近 Camera 名稱與距離，讓使用者知道 CCTV 與事件位置並非同一點。
-- [ ] 沒有鄰近 Camera 時不顯示驗證按鈕，不製造錯誤期待。
-- [ ] 不把交通事件混進收藏／最近觀看 Camera 資料。
+- [ ] 新增高速公路即時路況 normalized model。
+- [ ] 串接 TDX `GET /api/basic/v2/Road/Traffic/Live/Freeway`，沿用既有 server-side OAuth helper。
+- [ ] 正規化 `SectionID`、`TravelTime`、`TravelSpeed`、`CongestionLevelID`、`CongestionLevel`、`DataCollectTime`。
+- [ ] parser 兼容裸 array、`LiveTraffics`、`LiveTraffic`、`LiveTrafficList` 等常見 envelope，不依賴單一回傳包裝。
+- [ ] 新增 `/api/traffic-flow`，快取約 60 秒。
+- [ ] 未設定 TDX 金鑰或上游暫時失敗時 graceful degradation，不影響 Camera / traffic-events 功能。
+- [ ] 本任務不猜測 SectionID 的地理位置；geometry join 留給 M7.2。
 - [ ] GitHub Actions CI build 通過。
 
-完成後 M6 結案，後續進入 M7 路況判斷深化。
+完成後將 Current task 更新成 M7.2 — Freeway section metadata / shape join。
 
 ---
 
 ## 已完成任務
 
-### M6.2 — Traffic event map overlay（已完成）
+### M6.3 — Event filters / Camera verification workflow（已完成）
 
-- [x] `Map` 獨立讀取 `/api/traffic-events`，Camera API 載入不受影響。
-- [x] TDX 啟用時才顯示交通事件切換；未啟用時維持 Camera-only。
-- [x] 交通事件使用獨立 Leaflet layer，不混入 Camera clustering。
-- [x] 事件依 `info / warning / serious` 顯示不同警示色。
-- [x] 事件 popup 顯示標題、道路、影響描述與發布時間。
-- [x] 事件 layer 採 viewport + 差異更新，與 Camera optimization 共存。
-- [x] GitHub Actions run `34704812771` 成功。
+- [x] 交通事件支援「全部／警示以上／嚴重」篩選。
+- [x] 事件 popup 尋找最近的目前可見 CCTV。
+- [x] 15 km 內顯示 Camera 名稱、距離與「查看最近監視器」。
+- [x] 點驗證按鈕沿用既有 Camera `onSelect`，不建立平行流程。
+- [x] 沒有合理距離 Camera 時不顯示驗證操作。
+- [x] 交通事件不混入 Camera 收藏／最近觀看。
+- [x] GitHub Actions run `34704931928` 成功。
+
+### M6.2 — Traffic event map overlay（已完成）
+- [x] 事件獨立 Leaflet layer、切換、severity 視覺與 popup。
+- [x] CI `34704812771` 成功。
 
 ### M6.1 — TDX road-event foundation（已完成）
-
-- [x] `TrafficEvent` / source response model。
-- [x] server-side TDX OAuth token 快取。
-- [x] 國道道路事件 adapter 與 `/api/traffic-events`。
-- [x] 未設定金鑰／上游失敗皆 graceful degradation。
-- [x] `.env.example`。
-- [x] GitHub Actions run `34704685825` 成功。
+- [x] TDX OAuth、事件 model、adapter、`/api/traffic-events` 與 graceful degradation。
+- [x] CI `34704685825` 成功。
 
 ### M5 — 道路模式（已完成）
 - [x] M5.1 Road grouping — CI `34704232348`
@@ -83,10 +83,14 @@
 ### M6 — 即時交通事件
 - [x] M6.1 TDX road-event foundation
 - [x] M6.2 Traffic event map overlay
-- [ ] M6.3 Event filters / Camera verification workflow — **ChatGPT**
+- [x] M6.3 Event filters / Camera verification workflow
 
-### M7 — 路況判斷深化（暫定）
-- [ ] 壅塞／旅行速度或路況資訊 overlay
+### M7 — 壅塞／旅行速度
+- [ ] M7.1 Freeway live traffic foundation — **ChatGPT**
+- [ ] M7.2 Freeway section metadata / shape join
+- [ ] M7.3 Congestion map overlay / Camera verification
+
+### M8 — 後續路況深化（暫定）
 - [ ] CMS / 即時資訊整合
 - [ ] 天氣／降雨與 CCTV 交叉判讀
 
@@ -94,4 +98,4 @@
 
 ## Executor 原則
 
-預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions處理。
+預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions 處理。
