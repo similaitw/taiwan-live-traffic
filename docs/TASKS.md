@@ -6,45 +6,42 @@
 
 ## Current task
 
-### M8.1 — CMS foundation
+### M8.2 — CMS map overlay / Camera verification
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 串接 TDX 高速公路 CMS 靜態 `/Road/Traffic/CMS/Freeway` 與動態 `/Road/Traffic/Live/CMS/Freeway`。
-- [ ] 新增 CMS normalized model，以 `CMSUID` 優先、`CMSID` fallback 對應靜態與動態資料。
-- [ ] 靜態資料至少處理 CMSID／CMSUID、PositionLat／PositionLon、LinkID，以及可取得的 RoadID／RoadName／RoadDirection。
-- [ ] 動態資料至少處理 MessageStatus、Messages/Text、Status、DataCollectTime；兼容舊版單一 `Text` 與新版 `Messages` 陣列。
-- [ ] 新增 `/api/cms`，靜態資料長快取、動態資料約 120 秒快取。
-- [ ] 預設保留所有設備，但輸出 `active` 旗標供 UI 判斷目前是否有循環訊息。
-- [ ] 未設定 TDX 金鑰或任一來源失敗時 graceful degradation；若只取得靜態或只取得動態則回 partial。
-- [ ] 本任務不渲染地圖 CMS marker；留給 M8.2。
+- [ ] `Map` 獨立讀取 `/api/cms`，不得影響 Camera／事件／壅塞資料載入。
+- [ ] TDX CMS 啟用時顯示「官方看板」切換；預設 overlay 僅顯示 `active=true` 且有座標的 CMS。
+- [ ] `MapInner` 新增獨立 CMS Leaflet layer，不混進 Camera clustering、事件 marker 或壅塞 polyline。
+- [ ] CMS marker 視覺需與 Camera／事件清楚區分。
+- [ ] popup 顯示道路／方向、看板訊息、設備狀態、資料時間。
+- [ ] popup 尋找 15 km 內最近 Camera，顯示距離並提供「查看最近監視器」。
+- [ ] CMS 無座標、資料不完整或來源 partial 時不得造成地圖錯誤。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M8.2 — CMS map overlay / Camera verification。
+完成後將 Current task 更新成 M8.3 — CMS filtering / road workflow。
 
 ---
 
 ## 已完成任務
 
-### M7.3 — Congestion map overlay / Camera verification（已完成）
+### M8.1 — CMS foundation（已完成）
 
-- [x] `/api/traffic-flow` 與 `/api/traffic-sections` 以 SectionID join。
-- [x] 壅塞使用獨立 Leaflet polyline layer，不干擾 Camera / traffic-event layers。
-- [x] 依官方級別呈現順暢、車多、壅塞、嚴重壅塞、極度壅塞與未知／異常。
-- [x] 提供「即時路況」與「只看壅塞」。
-- [x] 路段 popup 顯示速度、旅行時間、壅塞狀態、資料時間。
-- [x] 15 km 內可直接開啟最近 CCTV 驗證。
-- [x] GitHub Actions run `34705369615` 成功。
+- [x] 串接 TDX CMS 靜態 `/Road/Traffic/CMS/Freeway` 與動態 `/Road/Traffic/Live/CMS/Freeway`。
+- [x] 以 CMSUID 優先、CMSID fallback 合併靜態與動態資料並去重。
+- [x] 靜態正規化座標／Link／道路欄位；動態正規化 MessageStatus／Messages／Status／DataCollectTime。
+- [x] 兼容舊版 `Text` 與新版 `Messages`。
+- [x] `/api/cms`：靜態 6 小時 cache、動態 2 分鐘 cache。
+- [x] 輸出 `active` 供 UI 判斷目前是否有循環訊息。
+- [x] 支援 disabled / partial / error graceful degradation。
+- [x] GitHub Actions run `34705565204` 成功。
 
-### M7.2 — Freeway section metadata / shape join（已完成）
-- [x] Section / SectionShape join、WKT geometry parser、`/api/traffic-sections`。
-- [x] CI `34705149764` 成功。
-
-### M7.1 — Freeway live traffic foundation（已完成）
-- [x] Live/Freeway normalized API `/api/traffic-flow`。
-- [x] CI `34705057134` 成功。
+### M7 — 壅塞／旅行速度（已完成）
+- [x] M7.1 Freeway live traffic foundation — CI `34705057134`
+- [x] M7.2 Freeway section metadata / shape join — CI `34705149764`
+- [x] M7.3 Congestion map overlay / Camera verification — CI `34705369615`
 
 ### M6 — 即時交通事件（已完成）
 - [x] M6.1 TDX road-event foundation — CI `34704685825`
@@ -93,8 +90,8 @@
 - [x] M7.3
 
 ### M8 — CMS / 官方即時提醒
-- [ ] M8.1 CMS foundation — **ChatGPT**
-- [ ] M8.2 CMS map overlay / Camera verification
+- [x] M8.1 CMS foundation
+- [ ] M8.2 CMS map overlay / Camera verification — **ChatGPT**
 - [ ] M8.3 CMS filtering / road workflow
 
 ### M9 — 天氣／降雨（暫定）
