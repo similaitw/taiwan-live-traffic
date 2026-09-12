@@ -13,12 +13,13 @@
 目標／範圍：
 
 - [ ] 新增 CWA 雨量觀測 normalized model。
-- [ ] 串接中央氣象署 `O-A0002-001` 雨量觀測站資料，授權碼只留在 server-side。
+- [ ] 串接中央氣象署 `O-A0002-001` 雨量觀測站資料，優先使用 CWA 官方管理的公開 AWS Open Data raw JSON，不要求額外 API key。
 - [ ] 正規化 StationId / StationName / lat / lng / County / Town / observation time。
-- [ ] 正規化 10min / 1hr / 3hr / 6hr / 12hr / 24hr / daily accumulated rainfall；缺值與負值視為 unavailable，不當成 0。
-- [ ] parser 對 CWA JSON envelope 與欄位大小寫保持寬鬆相容。
+- [ ] 正規化 Now / 10min / 1hr / 3hr / 6hr / 12hr / 24hr 累積雨量；缺值、異常碼與負值視為 unavailable，不當成 0。
+- [ ] parser 兼容 `cwaopendata.dataset.Station`、`records.Station`、`records.location` 與裸 array 等常見 envelope。
+- [ ] WGS84 座標優先；沒有 WGS84 時才使用可用座標 fallback。
 - [ ] 新增 `/api/rainfall`，快取約 10 分鐘。
-- [ ] 新增 `CWA_API_KEY` 環境變數範本；未設定或上游失敗時 graceful degradation，不影響 Camera / TDX 功能。
+- [ ] 上游失敗時 graceful degradation，不影響 Camera / TDX 功能。
 - [ ] 本任務不渲染地圖；雷達與站點 overlay 留給 M9.2。
 - [ ] GitHub Actions CI build 通過。
 
