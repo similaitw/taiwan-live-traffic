@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { Camera } from '@/types/camera';
 import { getDistance } from '@/lib/geo';
+import { matchesCameraSearch } from '@/lib/camera-search';
 import { getCameraRoadNumber, getRoadNeighbors, groupCamerasByRoad } from '@/lib/roads';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -202,14 +203,8 @@ export default function HomePage() {
       if (favoritesOnly && !favoriteIdSet.has(camera.id)) return false;
       if (recentOnly && !recentIdSet.has(camera.id)) return false;
       if (typeFilter !== 'all' && camera.type !== typeFilter) return false;
-      if (!query) return true;
-      const q = query.toLowerCase();
-      return (
-        camera.name.toLowerCase().includes(q) ||
-        camera.id.toLowerCase().includes(q) ||
-        (camera.road?.toLowerCase().includes(q) ?? false) ||
-        (camera.roadNumber?.toLowerCase().includes(q) ?? false)
-      );
+      if (query && !matchesCameraSearch(camera, query)) return false;
+      return true;
     })
     .map((camera) => {
       if (!userLocation) return { camera, distance: Infinity };
