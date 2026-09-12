@@ -12,9 +12,18 @@ interface Props {
   query: string;
   onSelect: (c: Camera) => void;
   variant?: 'grid' | 'sidebar';
+  favoriteIds?: string[];
+  onToggleFavorite?: (c: Camera) => void;
 }
 
-export default function CameraList({ cameras, query, onSelect, variant = 'grid' }: Props) {
+export default function CameraList({
+  cameras,
+  query,
+  onSelect,
+  variant = 'grid',
+  favoriteIds = [],
+  onToggleFavorite,
+}: Props) {
   const [displayCount, setDisplayCount] = useState(INITIAL_LOAD);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -74,7 +83,12 @@ export default function CameraList({ cameras, query, onSelect, variant = 'grid' 
       <div className={gridClass}>
         {visible.map((c, i) => (
           <div key={c.id} style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}>
-            <CameraCard camera={c} onClick={onSelect} />
+            <CameraCard
+              camera={c}
+              onClick={onSelect}
+              favorite={favoriteIds.includes(c.id)}
+              onToggleFavorite={onToggleFavorite}
+            />
           </div>
         ))}
       </div>
