@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { Camera } from '@/types/camera';
 import { getDistance } from '@/lib/geo';
+import { useGeolocation } from '@/hooks/useGeolocation';
 import SearchBar from '@/components/SearchBar';
 import CameraList from '@/components/CameraList';
 import CameraModal from '@/components/CameraModal';
@@ -30,28 +31,12 @@ export default function HomePage() {
   const [view, setView] = useState<View>('map');
   const [selected, setSelected] = useState<Camera | null>(null);
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sortByNearest, setSortByNearest] = useState(false);
-
-  const locateMe = () => {
-    if (!navigator.geolocation) {
-      setError('此瀏覽器不支援地理定位');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-        setError(null);
-      },
-      (err) => {
-        setError(`定位失敗：${err.message}`);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
+  const {
+    location: userLocation,
+    error: geolocationError,
+    locate: locateMe,
+  } = useGeolocation({ autoLocate: true });
 
   useEffect(() => {
     fetch('/api/cameras')
@@ -62,19 +47,6 @@ export default function HomePage() {
       .then((data: Camera[]) => setCameras(data))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
   }, []);
 
   const handleSelect = useCallback((c: Camera) => setSelected(c), []);
@@ -245,9 +217,9 @@ export default function HomePage() {
             </span>
           </span>
         )}
-        {error && (
+        {(error || geolocationError) && (
           <span className="text-xs ml-2" style={{ color: 'var(--accent-pink)' }}>
-            {error}
+            {error || geolocationError}
           </span>
         )}
       </div>
