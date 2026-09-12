@@ -19,9 +19,15 @@ const COLORS: Record<Camera['type'], string> = {
 };
 
 interface CameraCluster {
+  key: string;
   cameras: Camera[];
   lat: number;
   lng: number;
+}
+
+interface RenderedMarker {
+  marker: L.Marker;
+  signature: string;
 }
 
 function makeIcon(type: Camera['type']): L.DivIcon {
@@ -73,9 +79,13 @@ function makeClusterIcon(count: number): L.DivIcon {
 }
 
 function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraCluster[] {
-  // At close zoom levels individual cameras are more useful than clustering.
   if (zoom >= 15) {
-    return cameras.map((camera) => ({ cameras: [camera], lat: camera.lat, lng: camera.lng }));
+    return cameras.map((camera) => ({
+      key: `camera:${camera.id}`,
+      cameras: [camera],
+      lat: camera.lat,
+      lng: camera.lng,
+    }));
   }
 
   const cellSize = zoom <= 7 ? 110 : zoom <= 9 ? 90 : zoom <= 11 ? 72 : zoom <= 13 ? 56 : 42;
@@ -83,15 +93,15 @@ function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraClus
 
   for (const camera of cameras) {
     const point = map.project(L.latLng(camera.lat, camera.lng), zoom);
-    const key = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
-    const existing = groups.get(key);
+    const gridKey = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
+    const existing = groups.get(gridKey);
 
     if (existing) {
       existing.cameras.push(camera);
       existing.latSum += camera.lat;
       existing.lngSum += camera.lng;
     } else {
-      groups.set(key, {
+      groups.set(gridKey, {
         cameras: [camera],
         latSum: camera.lat,
         lngSum: camera.lng,
@@ -99,11 +109,19 @@ function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraClus
     }
   }
 
-  return [...groups.values()].map((group) => ({
+  return [...groups.entries()].map(([gridKey, group]) => ({
+    key: group.cameras.length === 1
+      ? `camera:${group.cameras[0]!.id}`
+      : `cluster:${zoom}:${gridKey}`,
     cameras: group.cameras,
     lat: group.latSum / group.cameras.length,
     lng: group.lngSum / group.cameras.length,
   }));
+}
+
+function clusterSignature(cluster: CameraCluster): string {
+  if (cluster.cameras.length === 1) return cluster.cameras[0]!.id;
+  return cluster.cameras.map((camera) => camera.id).sort().join('|');
 }
 
 interface Props {
@@ -118,6 +136,8 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
+  const renderedMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
+  const renderFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -134,6 +154,8 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
     layerRef.current = L.layerGroup().addTo(mapRef.current);
 
     return () => {
+      if (renderFrameRef.current !== null) cancelAnimationFrame(renderFrameRef.current);
+      renderedMarkersRef.current.clear();
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -168,14 +190,81 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
   useEffect(() => {
     if (!mapRef.current || !layerRef.current) return;
 
-    const renderMarkers = () => {
-      const map = mapRef.current!;
-      const layer = layerRef.current!;
-      layer.clearLayers();
+    const map = mapRef.current;
+    const layer = layerRef.current;
 
-      const filtered = cameras.filter((camera) => {
+    const createCameraMarker = (camera: Camera): L.Marker => {
+      const marker = L.marker([camera.lat, camera.lng], {
+        icon: makeIcon(camera.type),
+        zIndexOffset: 1000,
+        title: camera.name,
+      });
+      const color = COLORS[camera.type];
+
+      const previewContent = `
+        <div style="width:200px; font-family:'Noto Sans TC',sans-serif;">
+          <div style="position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#0a0e1a; margin-bottom:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+            <img src="/api/proxy/snapshot?url=${encodeURIComponent(camera.snapshotUrl ?? camera.streamUrl)}" alt="${camera.name}"
+              style="width:100%; height:100%; object-fit:cover;"
+              onerror="this.style.display='none'"/>
+          </div>
+          <div style="padding:0 2px;">
+            <div style="font-weight:700; color:#e8ecf4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; line-height:1.4; margin-bottom:4px;">
+              ${camera.name}
+            </div>
+            <div style="color:#4b5563; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; font-family:'JetBrains Mono',monospace;">
+              ${camera.road ?? '—'}
+            </div>
+            <div style="padding-top:8px; border-top:1px solid rgba(255,255,255,0.06); color:${color}; font-size:10px; font-weight:700; text-align:center; letter-spacing:0.05em;">
+              點擊查看
+            </div>
+          </div>
+        </div>
+      `;
+
+      const popup = L.popup({ maxWidth: 220, className: 'leaflet-camera-preview' })
+        .setContent(previewContent);
+
+      marker.on('mouseover', () => {
+        popup.setLatLng(marker.getLatLng()).openOn(map);
+      });
+      marker.on('mouseout', () => map.closePopup(popup));
+      marker.on('click', () => {
+        map.setView(marker.getLatLng(), Math.max(map.getZoom(), 13), {
+          animate: true,
+          duration: 0.8,
+        });
+        map.closePopup(popup);
+        onSelect(camera);
+      });
+
+      return marker;
+    };
+
+    const createClusterMarker = (cluster: CameraCluster, zoom: number): L.Marker => {
+      const marker = L.marker([cluster.lat, cluster.lng], {
+        icon: makeClusterIcon(cluster.cameras.length),
+        zIndexOffset: 800,
+        keyboard: true,
+        title: `${cluster.cameras.length} 支監視器`,
+      });
+
+      marker.on('click', () => {
+        map.setView([cluster.lat, cluster.lng], Math.min(zoom + 2, 16), {
+          animate: true,
+          duration: 0.6,
+        });
+      });
+
+      return marker;
+    };
+
+    const renderMarkers = () => {
+      const q = query.toLowerCase();
+      const paddedBounds = map.getBounds().pad(0.35);
+      const visible = cameras.filter((camera) => {
+        if (!paddedBounds.contains(L.latLng(camera.lat, camera.lng))) return false;
         if (!query) return true;
-        const q = query.toLowerCase();
         return (
           camera.name.toLowerCase().includes(q) ||
           camera.id.toLowerCase().includes(q) ||
@@ -184,93 +273,55 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
       });
 
       const zoom = map.getZoom();
-      const clusters = clusterCameras(map, filtered, zoom);
+      const clusters = clusterCameras(map, visible, zoom);
+      const nextKeys = new Set<string>();
 
-      clusters.forEach((cluster) => {
-        if (cluster.cameras.length > 1) {
-          const marker = L.marker([cluster.lat, cluster.lng], {
-            icon: makeClusterIcon(cluster.cameras.length),
-            zIndexOffset: 800,
-            keyboard: true,
-            title: `${cluster.cameras.length} 支監視器`,
-          });
+      for (const cluster of clusters) {
+        const signature = clusterSignature(cluster);
+        nextKeys.add(cluster.key);
+        const existing = renderedMarkersRef.current.get(cluster.key);
 
-          marker.on('click', () => {
-            map.setView([cluster.lat, cluster.lng], Math.min(zoom + 2, 16), {
-              animate: true,
-              duration: 0.6,
-            });
-          });
+        if (existing?.signature === signature) continue;
 
-          marker.addTo(layer);
-          return;
+        if (existing) {
+          layer.removeLayer(existing.marker);
+          renderedMarkersRef.current.delete(cluster.key);
         }
 
-        const camera = cluster.cameras[0];
-        if (!camera) return;
-
-        const marker = L.marker([camera.lat, camera.lng], {
-          icon: makeIcon(camera.type),
-          zIndexOffset: 1000,
-          title: camera.name,
-        });
-        const color = COLORS[camera.type];
-
-        const previewContent = `
-          <div style="width:200px; font-family:'Noto Sans TC',sans-serif;">
-            <div style="position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#0a0e1a; margin-bottom:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
-              <img src="/api/proxy/snapshot?url=${encodeURIComponent(camera.snapshotUrl ?? camera.streamUrl)}" alt="${camera.name}"
-                style="width:100%; height:100%; object-fit:cover;"
-                onerror="this.style.display='none'"/>
-            </div>
-            <div style="padding:0 2px;">
-              <div style="font-weight:700; color:#e8ecf4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; line-height:1.4; margin-bottom:4px;">
-                ${camera.name}
-              </div>
-              <div style="color:#4b5563; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; font-family:'JetBrains Mono',monospace;">
-                ${camera.road ?? '—'}
-              </div>
-              <div style="padding-top:8px; border-top:1px solid rgba(255,255,255,0.06); color:${color}; font-size:10px; font-weight:700; text-align:center; letter-spacing:0.05em;">
-                點擊查看
-              </div>
-            </div>
-          </div>
-        `;
-
-        const popup = L.popup({ maxWidth: 220, className: 'leaflet-camera-preview' })
-          .setContent(previewContent);
-
-        marker.on('mouseover', () => {
-          popup.setLatLng(marker.getLatLng()).openOn(map);
-        });
-
-        marker.on('mouseout', () => {
-          map.closePopup(popup);
-        });
-
-        marker.on('click', () => {
-          const currentZoom = map.getZoom();
-          map.setView(marker.getLatLng(), Math.max(currentZoom, 13), {
-            animate: true,
-            duration: 0.8,
-          });
-          map.closePopup(popup);
-          onSelect(camera);
-        });
+        const marker = cluster.cameras.length > 1
+          ? createClusterMarker(cluster, zoom)
+          : createCameraMarker(cluster.cameras[0]!);
 
         marker.addTo(layer);
+        renderedMarkersRef.current.set(cluster.key, { marker, signature });
+      }
+
+      for (const [key, rendered] of renderedMarkersRef.current.entries()) {
+        if (nextKeys.has(key)) continue;
+        layer.removeLayer(rendered.marker);
+        renderedMarkersRef.current.delete(key);
+      }
+    };
+
+    const scheduleRender = () => {
+      if (renderFrameRef.current !== null) cancelAnimationFrame(renderFrameRef.current);
+      renderFrameRef.current = requestAnimationFrame(() => {
+        renderFrameRef.current = null;
+        renderMarkers();
       });
     };
 
-    renderMarkers();
-
-    const handleMapChange = () => renderMarkers();
-    mapRef.current.on('moveend', handleMapChange);
-    mapRef.current.on('zoomend', handleMapChange);
+    scheduleRender();
+    map.on('moveend', scheduleRender);
+    map.on('zoomend', scheduleRender);
 
     return () => {
-      mapRef.current?.off('moveend', handleMapChange);
-      mapRef.current?.off('zoomend', handleMapChange);
+      map.off('moveend', scheduleRender);
+      map.off('zoomend', scheduleRender);
+      if (renderFrameRef.current !== null) {
+        cancelAnimationFrame(renderFrameRef.current);
+        renderFrameRef.current = null;
+      }
     };
   }, [cameras, query, onSelect]);
 
