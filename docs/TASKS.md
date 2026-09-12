@@ -6,28 +6,42 @@
 
 ## Current task
 
-### M2.1 — Mobile map-first layout
+### M2.2 — Desktop sidebar layout
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 手機版改為 map-first，地圖成為主要畫面。
-- [ ] 搜尋列改為地圖上方 floating search bar。
-- [ ] 類型 filter chips 可水平滑動且不擠壓地圖高度。
-- [ ] 定位改為地圖 floating button。
-- [ ] 手機版弱化／移除佔高度的傳統 Header 與 filter bar。
-- [ ] 保留既有搜尋、類型篩選、定位、最近排序、Map/List 功能相容性；若手機 UI 隱藏 List toggle，桌面既有功能仍需保留。
-- [ ] 375px 寬度不得有主要操作被遮住或水平溢位。
-- [ ] 768px、1280px 既有介面不可明顯退化；M2.2 才正式做 desktop sidebar。
+- [ ] 桌面版（`md` 以上）改為左側 sidebar + 右側 map 同時顯示。
+- [ ] sidebar 約 320–380px，包含搜尋、類型篩選與 Camera list。
+- [ ] 點 sidebar Camera 要維持既有選取／開啟詳細功能，並保留地圖互動。
+- [ ] 桌面不再需要 Map/List 二選一才能查看內容；地圖始終為主要工作區。
+- [ ] 手機版 M2.1 map-first 浮動控制不得退化。
+- [ ] 768px 與 1280px 版面不應有明顯溢位或主要操作遮擋。
 - [ ] 不在此任務加入 Bottom Sheet；留給 M2.3。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M2.2 — Desktop sidebar layout。
+完成後將 Current task 更新成 M2.3 — Camera Bottom Sheet。
 
 ---
 
 ## 已完成任務
+
+### M2.1 — Mobile map-first layout（已完成）
+
+**Executor: ChatGPT**
+
+- [x] 手機版改為 map-first，傳統 Header 與 filter bar 在 `< md` 隱藏。
+- [x] 搜尋列改為地圖上方 floating search bar。
+- [x] 類型 filter chips 改為可水平滑動的 floating chips。
+- [x] 定位與「最近」改為地圖 floating actions。
+- [x] 保留手機 Map/List 切換，並以底部 compact switch 呈現。
+- [x] 手機地圖取消外層 padding／圓角留白，成為主要畫面。
+- [x] Leaflet 縮放控制在手機下移，避免被搜尋／filter 區遮住。
+- [x] 桌面／平板既有 Header、filter 與 Map/List 功能維持。
+- [x] GitHub Actions run `34703338571`：Install dependencies 與 Build 均成功。
+
+---
 
 ### M1.3 — hooks 基礎拆分（已完成）
 
@@ -79,8 +93,8 @@
 
 ### M2 — UI 2.0
 
-- [ ] M2.1 Mobile map-first layout — **ChatGPT**
-- [ ] M2.2 Desktop sidebar layout
+- [x] M2.1 Mobile map-first layout — **ChatGPT**
+- [ ] M2.2 Desktop sidebar layout — **ChatGPT**
 - [ ] M2.3 Camera Bottom Sheet
 
 ### M3 — 地圖效能
