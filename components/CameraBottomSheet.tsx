@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import type { Camera } from '@/types/camera';
+import type { RoadNeighbors } from '@/lib/roads';
 import CameraShareButton from './CameraShareButton';
+import RoadCameraNavigator from './RoadCameraNavigator';
 
 const TYPE_LABEL: Record<Camera['type'], string> = {
   freeway: '國道',
@@ -22,6 +24,8 @@ interface Props {
   onOpenLive: (camera: Camera) => void;
   favorite?: boolean;
   onToggleFavorite?: (camera: Camera) => void;
+  roadNeighbors?: RoadNeighbors | null;
+  onNavigateRoad?: (camera: Camera) => void;
 }
 
 export default function CameraBottomSheet({
@@ -30,6 +34,8 @@ export default function CameraBottomSheet({
   onOpenLive,
   favorite = false,
   onToggleFavorite,
+  roadNeighbors,
+  onNavigateRoad,
 }: Props) {
   const [snapshotState, setSnapshotState] = useState<'loading' | 'ready' | 'error'>('loading');
 
@@ -188,6 +194,16 @@ export default function CameraBottomSheet({
             </span>
           )}
         </div>
+
+        {roadNeighbors && onNavigateRoad && roadNeighbors.total > 1 && (
+          <div className="px-4 pt-3">
+            <RoadCameraNavigator
+              neighbors={roadNeighbors}
+              onNavigate={onNavigateRoad}
+              compact
+            />
+          </div>
+        )}
 
         <div className="p-4 pt-3 flex gap-2">
           <button
