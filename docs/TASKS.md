@@ -6,26 +6,36 @@
 
 ## Current task
 
-### M12.1 — Route corridor / Trip Mode foundation
+### M12.2 — Trip Mode UI / corridor summary
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 建立共用 route-corridor model，先以現有道路模式為基礎，不導入外部導航服務。
-- [ ] 對選定道路／方向整合沿線 Camera、即時壅塞路段、道路事件、CMS 與附近雨量觀測資訊。
-- [ ] 產生中性、可驗證的沿線摘要資料：Camera 數、壅塞路段數、事件數、CMS 訊息數、雨量狀態。
-- [ ] 不以直線距離假裝成導航路徑；M12.1 只做 road corridor aggregation。
-- [ ] 資料缺失必須 graceful degradation；TDX 未設定時仍可使用 Camera / CWA 部分資訊。
-- [ ] route corridor 計算抽成共用 utility，不把聚合邏輯直接塞進 UI component。
-- [ ] 不改變既有 Camera / traffic / CMS / rainfall API response shape。
+- [ ] 選定道路時顯示 Trip Mode 沿線摘要，不影響既有道路篩選與 Camera 操作。
+- [ ] 摘要至少呈現 CCTV、壅塞路段、事件、CMS 訊息、附近雨量站與近 1 小時最大雨量。
+- [ ] UI 必須清楚區分「沿線聚合」與真正導航，不宣稱已規劃 A→B 路線。
+- [ ] 手機採可收合摘要，避免遮住 Bottom Sheet／圖層面板；桌面可使用較完整卡片。
+- [ ] TDX unavailable 時仍顯示 Camera / CWA 可用資訊，不把 0 件誤寫成「沒有事件」而忽略資料來源不可用。
+- [ ] Trip Mode summary 使用 `buildRouteCorridor()`，不在 UI 重寫道路聚合邏輯。
+- [ ] 不自動開啟 LIVE；Camera 驗證仍沿用現有 snapshot-first 流程。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M12.2 — Trip Mode UI / corridor summary。
+完成後將 Current task 更新成 M12.3 — Corridor navigation / share state。
 
 ---
 
 ## 已完成任務
+
+### M12.1 — Route corridor / Trip Mode foundation（已完成）
+- [x] 新增 `types/route-corridor.ts` 共用資料模型。
+- [x] 新增 `lib/route-corridor.ts`，以道路編號／方向聚合 Camera、即時壅塞、事件、CMS 與附近雨量。
+- [x] Camera 依 mile 排序；壅塞沿用既有 TDX congestion level >= 3 判定。
+- [x] 雨量只使用 corridor Camera 15 km 內測站作沿線參考，不把直線距離冒充導航路徑。
+- [x] summary 輸出 Camera、壅塞路段、事件、CMS 設備／訊息、雨量站、有雨測站與近 1 小時最大雨量。
+- [x] 每個資料源保留 available / unavailable，TDX 未設定仍可產生部分 corridor。
+- [x] 不改既有 Camera / traffic / CMS / rainfall API response shape。
+- [x] GitHub Actions run `34712316259` 成功。
 
 ### M11.4 — Production diagnostics / deploy checklist（已完成）
 - [x] 新增 `docs/PRODUCTION_CHECKLIST.md`，涵蓋 GitHub CI、Vercel env、TDX、CWA、Camera API、proxy 與正式站 smoke check。
@@ -153,12 +163,12 @@
 - [x] M11.4 Production diagnostics / deploy checklist
 
 ### M12 — Route / Trip Mode
-- [ ] M12.1 Route corridor foundation — **ChatGPT**
-- [ ] M12.2 Trip Mode UI / corridor summary
+- [x] M12.1 Route corridor foundation
+- [ ] M12.2 Trip Mode UI / corridor summary — **ChatGPT**
 - [ ] M12.3 Corridor navigation / share state
 
 ---
 
 ## Executor 原則
 
-預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions 處理。
+預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions處理。
