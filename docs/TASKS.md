@@ -8,24 +8,31 @@
 
 ## Current task
 
-### M14.1 — Dependency security upgrade
+### M15.1 — GitHub Actions runtime / build-cache modernization
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 升級 Next.js 至已修補近期 critical advisories 的 `>=16.3.3`。
-- [ ] 升級 `fast-xml-parser` 至 `>=5.10.1`，避開目前已知 entity-expansion DoS advisories。
-- [ ] 正確重建 `package-lock.json`，維持 `npm ci` 可重現安裝；不手工猜 integrity / transitive dependency。
-- [ ] 重新執行 `npm audit`，記錄剩餘漏洞數與 severity；若仍有 critical/high，逐項判斷是否可在本任務安全修復。
-- [ ] `npm run build` 通過，既有 Camera / TDX / CWA API 與 UI 不做功能性改寫。
-- [ ] 安全升級完成後移除任何一次性 dependency-update workflow／腳本。
+- [ ] 確認 `actions/checkout` / `actions/setup-node` 目前官方穩定 major，處理 runner 對舊 action Node runtime 的 deprecation warning。
+- [ ] 保持 Node.js 22 作為專案 build runtime，不因 action 自身 runtime 升級而改變應用程式 Node 版本。
+- [ ] 評估並加入安全的 Next.js `.next/cache` GitHub Actions cache，降低重複 production build 成本；cache miss 必須安全 fallback。
+- [ ] 保留 `npm ci`、`npm audit --audit-level=high`、`npm run build` 三道驗證。
+- [ ] 不使用 write permissions，不引入第三方未知 action。
+- [ ] GitHub Actions CI 全流程通過。
 
-完成後將 Current task 更新成 M14.2 — CI dependency audit guardrail。
+完成後再評估 M15.2 是否需要把 CI 拆成 dependency audit / build jobs 或加入 scheduled audit。
 
 ---
 
 ## 近期完成
+
+### M14 — Dependency / CI security（完成）
+- [x] Next.js `16.2.1` → `16.3.5`；`fast-xml-parser` `5.5.9` → `5.11.1`，由 npm 在 GitHub runner 正式重建 lockfile。
+- [x] 升級後 production build 成功，Next.js 16.3.5 / TypeScript / static generation 全部通過。One-shot updater run `34725091999`。
+- [x] `npm audit` 從 8 個漏洞（1 critical / 4 high / 2 moderate / 1 low）降為 2 個（0 critical / 0 high / 1 moderate / 1 low）。
+- [x] 一次性 dependency updater 已從 repo 移除。
+- [x] CI 新增 `npm audit --audit-level=high`，未來 high / critical 會阻擋 main；最終 CI `34725159970` 全綠。
 
 ### M13 — Search V2（完成）
 - [x] M13.1 共用 matcher：name / ID / road / roadNumber / county / district / mile / direction / tags；支援 NFKC、臺/台、多 token、`38K` / `38.2K` / `38+200`。CI `34724600973`。
@@ -37,12 +44,6 @@
 - [x] M12.1 Route corridor aggregation。CI `34712316259`。
 - [x] M12.2 Trip Mode UI / corridor summary。CI `34712481748`。
 - [x] M12.3 corridor share + mile-sorted Camera navigation。CI `34724413433`。
-
-### M11 — Production hardening（完成）
-- [x] Proxy redirect / SSRF hardening。CI `34709275148`。
-- [x] Source freshness / health visibility。CI `34709736577`。
-- [x] Live opt-in / lifecycle / 90s relay guardrail。CI `34709897660`。
-- [x] `/api/health` + `PRODUCTION_CHECKLIST.md`。CI `34712218377`。
 
 ---
 
@@ -61,7 +62,8 @@
 - [x] **M11 Production hardening** — 完成。
 - [x] **M12 Route / Trip Mode** — 完成。
 - [x] **M13 Search V2** — 完成。
-- [ ] **M14 Dependency / CI security** — 進行中。
+- [x] **M14 Dependency / CI security** — 完成。
+- [ ] **M15 CI modernization** — 進行中。
 
 ---
 
