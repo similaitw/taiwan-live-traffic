@@ -19,9 +19,17 @@ interface Props {
   camera: Camera | null;
   onClose: () => void;
   onOpenLive: (camera: Camera) => void;
+  favorite?: boolean;
+  onToggleFavorite?: (camera: Camera) => void;
 }
 
-export default function CameraBottomSheet({ camera, onClose, onOpenLive }: Props) {
+export default function CameraBottomSheet({
+  camera,
+  onClose,
+  onOpenLive,
+  favorite = false,
+  onToggleFavorite,
+}: Props) {
   const [snapshotState, setSnapshotState] = useState<'loading' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
@@ -93,17 +101,36 @@ export default function CameraBottomSheet({ camera, onClose, onOpenLive }: Props
             </h2>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="關閉監視器資訊"
-            className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {onToggleFavorite && (
+              <button
+                type="button"
+                onClick={() => onToggleFavorite(camera)}
+                aria-label={favorite ? '取消收藏' : '加入收藏'}
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all"
+                style={{
+                  background: favorite ? 'rgba(245,158,11,0.92)' : 'rgba(255,255,255,0.05)',
+                  color: favorite ? '#fff' : 'var(--text-secondary)',
+                  border: `1px solid ${favorite ? 'rgba(245,158,11,0.95)' : 'var(--border-subtle)'}`,
+                }}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill={favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                </svg>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="關閉監視器資訊"
+              className="w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="px-4">
