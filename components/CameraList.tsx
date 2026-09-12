@@ -11,9 +11,10 @@ interface Props {
   cameras: Camera[];
   query: string;
   onSelect: (c: Camera) => void;
+  variant?: 'grid' | 'sidebar';
 }
 
-export default function CameraList({ cameras, query, onSelect }: Props) {
+export default function CameraList({ cameras, query, onSelect, variant = 'grid' }: Props) {
   const [displayCount, setDisplayCount] = useState(INITIAL_LOAD);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -40,17 +41,14 @@ export default function CameraList({ cameras, query, onSelect }: Props) {
       { rootMargin: '100px' }
     );
 
-    if (endRef.current) {
-      observer.observe(endRef.current);
-    }
-
+    if (endRef.current) observer.observe(endRef.current);
     observerRef.current = observer;
     return () => observer.disconnect();
   }, [displayCount, filtered.length]);
 
   if (filtered.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
+      <div className={`flex flex-col items-center justify-center ${variant === 'sidebar' ? 'py-10' : 'py-20'}`}>
         <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
           style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)' }}>
           <svg className="w-8 h-8" style={{ color: 'var(--text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,12 +62,16 @@ export default function CameraList({ cameras, query, onSelect }: Props) {
     );
   }
 
+  const gridClass = variant === 'sidebar'
+    ? 'grid grid-cols-1 gap-3'
+    : 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3';
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${variant === 'sidebar' ? 'gap-3' : 'gap-4'}`}>
       <p className="text-[11px] font-mono tracking-wider" style={{ color: 'var(--text-muted)' }}>
-        SHOWING {visible.length} / {filtered.length} CAMERAS
+        顯示 {visible.length} / {filtered.length} 支監視器
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className={gridClass}>
         {visible.map((c, i) => (
           <div key={c.id} style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}>
             <CameraCard camera={c} onClick={onSelect} />
@@ -78,11 +80,11 @@ export default function CameraList({ cameras, query, onSelect }: Props) {
       </div>
 
       {displayCount < filtered.length && (
-        <div ref={endRef} className="flex justify-center py-8">
+        <div ref={endRef} className={`flex justify-center ${variant === 'sidebar' ? 'py-4' : 'py-8'}`}>
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 rounded-full animate-spin"
               style={{ border: '2px solid var(--border-subtle)', borderTopColor: 'var(--accent-freeway)' }} />
-            <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>LOADING MORE...</span>
+            <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>載入更多…</span>
           </div>
         </div>
       )}
