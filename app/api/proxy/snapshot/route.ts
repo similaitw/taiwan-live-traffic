@@ -1,4 +1,9 @@
 import { NextRequest } from 'next/server';
+import {
+  CameraProxyUrlError,
+  fetchAllowedCameraResource,
+  parseAllowedCameraUrl,
+} from '@/lib/camera-proxy-security';
 
 /**
  * Snapshot proxy: fetches a single frame from an image/MJPEG URL.
@@ -6,16 +11,6 @@ import { NextRequest } from 'next/server';
  * this endpoint reads just enough bytes to get one JPEG frame, then closes.
  * Cached for 30 seconds to avoid hammering upstream.
  */
-
-const ALLOWED_HOSTNAMES = [
-  'cctvs.freeway.gov.tw',
-  'tisvcloud.freeway.gov.tw',
-  'thbapp.thb.gov.tw',
-  'cctv.thb.gov.tw',
-  'cciv.thb.gov.tw',
-  'cctv-ss05.thb.gov.tw',
-  'its.taipei.gov.tw',
-];
 
 function concatUint8(arrays: Uint8Array[]): Uint8Array {
   const totalLength = arrays.reduce((acc, a) => acc + a.length, 0);
@@ -49,7 +44,6 @@ function imageResponse(body: ArrayBuffer | Uint8Array, contentType: string): Res
   });
 }
 
-// In-memory snapshot cache
 const snapshotCache = new Map<string, { data: ArrayBuffer; contentType: string; ts: number }>();
 const CACHE_TTL = 30_000;
 
@@ -59,23 +53,15 @@ export async function GET(req: NextRequest) {
     return new Response('Missing url parameter', { status: 400 });
   }
 
-  let parsed: URL;
   try {
-    parsed = new URL(rawUrl);
-  } catch {
+    parseAllowedCameraUrl(rawUrl);
+  } catch (error) {
+    if (error instanceof CameraProxyUrlError) {
+      return new Response(error.message, { status: error.status });
+    }
     return new Response('Invalid URL', { status: 400 });
   }
 
-  const hostname = parsed.hostname;
-  const isAllowed =
-    ALLOWED_HOSTNAMES.includes(hostname) ||
-    /^cctv-[a-z0-9]+\.thb\.gov\.tw$/.test(hostname);
-
-  if (!isAllowed) {
-    return new Response('URL not allowed', { status: 403 });
-  }
-
-  // Check cache
   const cached = snapshotCache.get(rawUrl);
   if (cached && Date.now() - cached.ts < CACHE_TTL) {
     return imageResponse(cached.data, cached.contentType);
@@ -85,14 +71,13 @@ export async function GET(req: NextRequest) {
   const timeout = setTimeout(() => controller.abort(), 8000);
 
   try {
-    const upstream = await fetch(rawUrl, {
+    const upstream = await fetchAllowedCameraResource(rawUrl, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://thbapp.thb.gov.tw/',
         'Accept': 'image/*,*/*;q=0.8',
       },
-      redirect: 'follow',
     });
 
     clearTimeout(timeout);
@@ -103,14 +88,12 @@ export async function GET(req: NextRequest) {
 
     const contentType = upstream.headers.get('content-type') ?? '';
 
-    // If it's a normal JPEG/PNG image, just return it
     if (!contentType.includes('multipart') && !contentType.includes('x-mixed-replace')) {
       const buf = await upstream.arrayBuffer();
       snapshotCache.set(rawUrl, { data: buf, contentType: contentType || 'image/jpeg', ts: Date.now() });
       return imageResponse(buf, contentType || 'image/jpeg');
     }
 
-    // MJPEG stream: read until we find a complete JPEG frame
     const reader = upstream.body?.getReader();
     if (!reader) {
       return new Response('No body', { status: 502 });
@@ -151,6 +134,9 @@ export async function GET(req: NextRequest) {
     return new Response('No frame captured', { status: 502 });
   } catch (error) {
     clearTimeout(timeout);
+    if (error instanceof CameraProxyUrlError) {
+      return new Response(error.message, { status: error.status });
+    }
     const errMsg = error instanceof Error ? error.message : String(error);
     return new Response('Fetch failed: ' + errMsg, { status: 502 });
   }
