@@ -6,26 +6,38 @@
 
 ## Current task
 
-### M2.2 — Desktop sidebar layout
+### M2.3 — Camera Bottom Sheet
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 桌面版（`md` 以上）改為左側 sidebar + 右側 map 同時顯示。
-- [ ] sidebar 約 320–380px，包含搜尋、類型篩選與 Camera list。
-- [ ] 點 sidebar Camera 要維持既有選取／開啟詳細功能，並保留地圖互動。
-- [ ] 桌面不再需要 Map/List 二選一才能查看內容；地圖始終為主要工作區。
-- [ ] 手機版 M2.1 map-first 浮動控制不得退化。
-- [ ] 768px 與 1280px 版面不應有明顯溢位或主要操作遮擋。
-- [ ] 不在此任務加入 Bottom Sheet；留給 M2.3。
+- [ ] 手機點擊 Camera marker 或清單項目時，先開啟 Bottom Sheet，而不是立即開大型直播 modal。
+- [ ] Bottom Sheet 顯示：名稱、類型、快照、道路／方向／公里數、基本狀態與「開啟直播」按鈕。
+- [ ] Bottom Sheet 必須可關閉，且不應阻擋整張地圖操作。
+- [ ] 預設只載 snapshot；只有按「開啟直播」才沿用既有 `CameraModal` / MJPEG 流程。
+- [ ] 桌面版維持既有詳細 modal 行為，不強制改成 Bottom Sheet。
+- [ ] 不在本任務實作收藏、分享、上一支／下一支；這些留給 M4/M5。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M2.3 — Camera Bottom Sheet。
+完成後將 Current task 更新成 M3.1 — Marker clustering。
 
 ---
 
 ## 已完成任務
+
+### M2.2 — Desktop sidebar layout（已完成）
+
+**Executor: ChatGPT**
+
+- [x] 桌面版改為左側 sidebar + 右側 map 同時顯示。
+- [x] sidebar 寬度為 340px，XL 為 380px，包含品牌、搜尋、類型篩選、定位、最近排序與 Camera list。
+- [x] CameraList 新增 `sidebar` variant，桌面 sidebar 使用單欄卡片。
+- [x] 桌面不再使用 Map/List 二選一；地圖始終為主要工作區。
+- [x] 手機版 M2.1 map-first 浮動控制維持原樣。
+- [x] GitHub Actions run `34703455963`：Install dependencies 與 Build 均成功。
+
+---
 
 ### M2.1 — Mobile map-first layout（已完成）
 
@@ -38,7 +50,6 @@
 - [x] 保留手機 Map/List 切換，並以底部 compact switch 呈現。
 - [x] 手機地圖取消外層 padding／圓角留白，成為主要畫面。
 - [x] Leaflet 縮放控制在手機下移，避免被搜尋／filter 區遮住。
-- [x] 桌面／平板既有 Header、filter 與 Map/List 功能維持。
 - [x] GitHub Actions run `34703338571`：Install dependencies 與 Build 均成功。
 
 ---
@@ -94,8 +105,8 @@
 ### M2 — UI 2.0
 
 - [x] M2.1 Mobile map-first layout — **ChatGPT**
-- [ ] M2.2 Desktop sidebar layout — **ChatGPT**
-- [ ] M2.3 Camera Bottom Sheet
+- [x] M2.2 Desktop sidebar layout — **ChatGPT**
+- [ ] M2.3 Camera Bottom Sheet — **ChatGPT**
 
 ### M3 — 地圖效能
 
