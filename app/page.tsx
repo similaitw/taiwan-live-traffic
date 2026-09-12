@@ -7,6 +7,7 @@ import { useGeolocation } from '@/hooks/useGeolocation';
 import SearchBar from '@/components/SearchBar';
 import CameraList from '@/components/CameraList';
 import CameraModal from '@/components/CameraModal';
+import CameraBottomSheet from '@/components/CameraBottomSheet';
 import Map from '@/components/Map';
 
 type View = 'map' | 'list';
@@ -36,7 +37,8 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<View>('map');
-  const [selected, setSelected] = useState<Camera | null>(null);
+  const [mobileSelected, setMobileSelected] = useState<Camera | null>(null);
+  const [liveCamera, setLiveCamera] = useState<Camera | null>(null);
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
   const [sortByNearest, setSortByNearest] = useState(false);
   const {
@@ -56,7 +58,12 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSelect = useCallback((camera: Camera) => setSelected(camera), []);
+  const handleDesktopSelect = useCallback((camera: Camera) => setLiveCamera(camera), []);
+  const handleMobileSelect = useCallback((camera: Camera) => setMobileSelected(camera), []);
+  const handleOpenLive = useCallback((camera: Camera) => {
+    setMobileSelected(null);
+    setLiveCamera(camera);
+  }, []);
 
   const filtered = cameras
     .filter((camera) => {
@@ -140,7 +147,6 @@ export default function HomePage() {
         </div>
       ) : (
         <>
-          {/* Desktop / tablet workspace: persistent sidebar + map. */}
           <div className="hidden md:flex h-full relative z-10">
             <aside
               className="w-[340px] xl:w-[380px] shrink-0 h-full flex flex-col"
@@ -220,7 +226,7 @@ export default function HomePage() {
                 <CameraList
                   cameras={filteredCameras}
                   query={query}
-                  onSelect={handleSelect}
+                  onSelect={handleDesktopSelect}
                   variant="sidebar"
                 />
               </div>
@@ -230,13 +236,12 @@ export default function HomePage() {
               <Map
                 cameras={filteredCameras}
                 query={query}
-                onSelect={handleSelect}
+                onSelect={handleDesktopSelect}
                 userLocation={userLocation}
               />
             </section>
           </div>
 
-          {/* Mobile remains map-first from M2.1. */}
           <div className="md:hidden h-full relative z-10">
             <div className="absolute inset-x-3 top-3 z-40">
               <div className="glass rounded-xl shadow-2xl p-1.5">
@@ -284,42 +289,49 @@ export default function HomePage() {
               </div>
             )}
 
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex rounded-full overflow-hidden glass shadow-2xl p-1">
-              {(['map', 'list'] as const).map((mobileView) => (
-                <button
-                  key={mobileView}
-                  type="button"
-                  onClick={() => setView(mobileView)}
-                  className="px-4 py-2 rounded-full text-xs font-bold transition-all"
-                  style={{
-                    background: view === mobileView ? 'var(--accent-freeway)' : 'transparent',
-                    color: view === mobileView ? '#fff' : 'var(--text-secondary)',
-                  }}
-                >
-                  {mobileView === 'map' ? '地圖' : '清單'}
-                </button>
-              ))}
-            </div>
+            {!mobileSelected && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex rounded-full overflow-hidden glass shadow-2xl p-1">
+                {(['map', 'list'] as const).map((mobileView) => (
+                  <button
+                    key={mobileView}
+                    type="button"
+                    onClick={() => setView(mobileView)}
+                    className="px-4 py-2 rounded-full text-xs font-bold transition-all"
+                    style={{
+                      background: view === mobileView ? 'var(--accent-freeway)' : 'transparent',
+                      color: view === mobileView ? '#fff' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {mobileView === 'map' ? '地圖' : '清單'}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {view === 'map' ? (
               <div className="h-full">
                 <Map
                   cameras={filteredCameras}
                   query={query}
-                  onSelect={handleSelect}
+                  onSelect={handleMobileSelect}
                   userLocation={userLocation}
                 />
               </div>
             ) : (
               <div className="h-full overflow-y-auto px-3 pt-32 pb-24">
-                <CameraList cameras={filteredCameras} query={query} onSelect={handleSelect} />
+                <CameraList cameras={filteredCameras} query={query} onSelect={handleMobileSelect} />
               </div>
             )}
           </div>
         </>
       )}
 
-      <CameraModal camera={selected} onClose={() => setSelected(null)} />
+      <CameraBottomSheet
+        camera={mobileSelected}
+        onClose={() => setMobileSelected(null)}
+        onOpenLive={handleOpenLive}
+      />
+      <CameraModal camera={liveCamera} onClose={() => setLiveCamera(null)} />
     </div>
   );
 }
