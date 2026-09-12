@@ -6,26 +6,37 @@
 
 ## Current task
 
-### M11.3 — Live stream bandwidth / lifecycle guardrails
+### M11.4 — Production diagnostics / deploy checklist
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 確認 MJPEG live 只在使用者主動按「開啟直播」後才建立，不得因卡片／地圖 hover 或 snapshot 預覽自動啟動。
-- [ ] Camera modal 關閉、切換 Camera、頁面離開或元件 unmount 時，應立即讓 live `<img>` / request 生命周期結束，不保留背景串流。
-- [ ] live 顯示提供明確「停止直播」控制；停止後回到 snapshot，不需關閉 Camera 詳細資訊。
-- [ ] 避免同一 Camera 同時建立多個 live proxy request；手機 Bottom Sheet 與桌面 modal 不得重複啟動直播。
-- [ ] `/api/proxy/image` 保持 no-cache、allowlist 與 redirect revalidation；本任務不擴大 upstream hostname。
-- [ ] snapshot 卡片／Bottom Sheet 繼續走 `/api/proxy/snapshot`，不得退回 MJPEG relay。
-- [ ] 如可行，對 live relay 增加合理 server-side timeout／abort guardrail，避免異常 upstream 永久佔用 function。
+- [ ] 新增 production deploy checklist，明確列出 GitHub CI、Vercel env、TDX、CWA、Camera API、proxy 與正式站 smoke check。
+- [ ] 提供不洩漏 secrets 的 server-side health / diagnostics 輸出，至少能辨識 TDX credentials 是否已設定與主要 API 是否可用。
+- [ ] health endpoint 不主動大量打上游；優先回報設定、版本／時間與安全狀態，避免自己成為額外負載來源。
+- [ ] 文件記錄 CWA rainfall / radar 使用公開官方 OpenData，無需另外設定 CWA API key。
+- [ ] 文件記錄 TDX 功能需要 `TDX_CLIENT_ID` / `TDX_CLIENT_SECRET`，但任何診斷輸出不得回傳實際值。
+- [ ] 列出正式站至少需驗證 375px / 768px / 1280px、Camera snapshot、手動 live、圖層面板、事件／路況／CMS／雨量 graceful degradation。
+- [ ] 記錄目前此 ChatGPT 執行環境無法直接取得使用者 Vercel team / production URL，因此正式站瀏覽器 smoke check 必須在可取得 deployment URL 的環境補跑，不可假裝已完成。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M11.4 — Production diagnostics / deploy checklist。
+完成後 M11 Production hardening 結案，再評估是否進 M12。
 
 ---
 
 ## 已完成任務
+
+### M11.3 — Live stream bandwidth / lifecycle guardrails（已完成）
+- [x] repo 僅 `CameraModal` 使用 `/api/proxy/image`；卡片、地圖 hover、Bottom Sheet 維持 snapshot。
+- [x] Camera Modal 預設顯示 snapshot，不再於快照載入後自動建立 MJPEG live。
+- [x] 使用者必須明確按「開啟直播」；直播中提供「停止直播」，停止後回到 snapshot。
+- [x] Camera 切換／modal 關閉會卸載 live `<img>`；分頁隱藏與 pagehide 也會停止 live。
+- [x] live error 改為手動重試，不做背景自動重連，避免重複 proxy request。
+- [x] `/api/proxy/image` 保留 no-cache、allowlist 與 redirect revalidation。
+- [x] server-side connect timeout 15 秒、live relay 最長 90 秒、Vercel `maxDuration=120`。
+- [x] client request abort 時同步 abort upstream stream。
+- [x] GitHub Actions run `34709897660` 成功。
 
 ### M11.2 — Source freshness / health visibility（已完成）
 - [x] 前端共用 source-health model 涵蓋 TDX events / flow / CMS 與 CWA rainfall。
@@ -128,8 +139,8 @@
 ### M11 — Production hardening
 - [x] M11.1 Camera proxy redirect / SSRF hardening
 - [x] M11.2 Source freshness / health visibility
-- [ ] M11.3 Live stream bandwidth / lifecycle guardrails — **ChatGPT**
-- [ ] M11.4 Production diagnostics / deploy checklist
+- [x] M11.3 Live stream bandwidth / lifecycle guardrails
+- [ ] M11.4 Production diagnostics / deploy checklist — **ChatGPT**
 
 ---
 
