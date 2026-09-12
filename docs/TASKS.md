@@ -6,28 +6,35 @@
 
 ## Current task
 
-### M9.1 — CWA rainfall observation foundation
+### M9.2 — Rainfall / radar map overlay
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 新增 CWA 雨量觀測 normalized model。
-- [ ] 串接中央氣象署 `O-A0002-001` 雨量觀測站資料，優先使用 CWA 官方管理的公開 AWS Open Data raw JSON，不要求額外 API key。
-- [ ] 正規化 StationId / StationName / lat / lng / County / Town / observation time。
-- [ ] 正規化 Now / 10min / 1hr / 3hr / 6hr / 12hr / 24hr 累積雨量；缺值、異常碼與負值視為 unavailable，不當成 0。
-- [ ] parser 兼容 `cwaopendata.dataset.Station`、`records.Station`、`records.location` 與裸 array 等常見 envelope。
-- [ ] WGS84 座標優先；沒有 WGS84 時才使用可用座標 fallback。
-- [ ] 新增 `/api/rainfall`，快取約 10 分鐘。
-- [ ] 上游失敗時 graceful degradation，不影響 Camera / TDX 功能。
-- [ ] 本任務不渲染地圖；雷達與站點 overlay 留給 M9.2。
+- [ ] `Map` 獨立讀取 `/api/rainfall`，不得影響 Camera / TDX / CMS 載入。
+- [ ] 新增 CWA `O-A0058-006` 雷達整合回波透明圖層，範圍 118–124E、20.5–26.5N。
+- [ ] 雷達使用獨立 Leaflet pane，位於底圖上、壅塞線段與所有 marker 下方。
+- [ ] 雷達可獨立開關，約每 10 分鐘刷新 URL，避免長時間顯示舊圖。
+- [ ] 雨量站使用獨立 marker layer，不混入 Camera clustering。
+- [ ] 預設僅顯示近 1 小時雨量 > 0 的測站，可切換顯示全部站。
+- [ ] 雨量 marker 依近 1 小時雨量採視覺強度區分，但不得宣稱為官方警戒門檻。
+- [ ] popup 顯示站名、縣市鄉鎮、觀測時間、10min / 1hr / 3hr / 24hr 雨量。
+- [ ] 無雨量、缺值、來源失敗或雷達圖載入失敗不得影響既有地圖。
+- [ ] 本任務不做 Rainfall → CCTV 驗證；留給 M9.3。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M9.2 — Rainfall / radar map overlay。
+完成後將 Current task 更新成 M9.3 — Rainfall / CCTV cross-check workflow。
 
 ---
 
 ## 已完成任務
+
+### M9.1 — CWA rainfall observation foundation（已完成）
+- [x] CWA `O-A0002-001` normalized model / parser / `/api/rainfall`。
+- [x] 使用 CWA 官方管理的公開 AWS Open Data raw JSON，不需額外 API key。
+- [x] WGS84 優先、特殊雨量值不誤判為 0、10 分鐘 cache、graceful degradation。
+- [x] GitHub Actions run `34708540549` 成功。
 
 ### M8 — CMS / 官方即時提醒（已完成）
 - [x] M8.1 CMS foundation — CI `34705565204`
@@ -91,8 +98,8 @@
 - [x] M8.3
 
 ### M9 — 天氣／降雨
-- [ ] M9.1 CWA rainfall observation foundation — **ChatGPT**
-- [ ] M9.2 Rainfall / radar map overlay
+- [x] M9.1 CWA rainfall observation foundation
+- [ ] M9.2 Rainfall / radar map overlay — **ChatGPT**
 - [ ] M9.3 Rainfall / CCTV cross-check workflow
 
 ---
