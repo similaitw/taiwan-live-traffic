@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { buildCameraSearchSuggestions } from '@/lib/camera-search-suggestions';
 import type { Camera } from '@/types/camera';
 
@@ -30,6 +30,9 @@ export default function CameraSearchBar({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const blurTimerRef = useRef<number | null>(null);
+  const idSeed = useId().replace(/:/g, '');
+  const listboxId = `camera-search-suggestions-${idSeed}`;
+  const optionId = (index: number) => `camera-search-option-${idSeed}-${index}`;
 
   const suggestions = useMemo(
     () => buildCameraSearchSuggestions(cameras, local),
@@ -126,9 +129,10 @@ export default function CameraSearchBar({
       return;
     }
 
-    if (event.key === 'Enter' && activeIndex >= 0) {
+    if (event.key === 'Enter') {
       event.preventDefault();
-      const item = flatSuggestions[activeIndex];
+      const index = activeIndex >= 0 ? activeIndex : 0;
+      const item = flatSuggestions[index];
       if (item) chooseFlat(item);
     }
   };
@@ -168,10 +172,11 @@ export default function CameraSearchBar({
         }}
         placeholder={placeholder ?? '搜尋路名、地點…'}
         role="combobox"
+        aria-label="搜尋交通監視器"
         aria-autocomplete="list"
         aria-expanded={showPanel}
-        aria-controls="camera-search-suggestions"
-        aria-activedescendant={activeIndex >= 0 ? `camera-search-option-${activeIndex}` : undefined}
+        aria-controls={listboxId}
+        aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
         className="w-full rounded-lg py-2 pl-9 pr-9 text-sm font-medium transition-all duration-200"
         style={{
           background: 'rgba(255,255,255,0.04)',
@@ -202,7 +207,7 @@ export default function CameraSearchBar({
 
       {showPanel && (
         <div
-          id="camera-search-suggestions"
+          id={listboxId}
           role="listbox"
           className="absolute left-0 right-0 top-[calc(100%+0.4rem)] z-[1200] max-h-[min(50dvh,22rem)] overflow-y-auto overscroll-contain rounded-xl p-2 backdrop-blur-xl"
           style={{
@@ -219,7 +224,7 @@ export default function CameraSearchBar({
                 return (
                   <SuggestionButton
                     key={item.roadNumber}
-                    id={`camera-search-option-${index}`}
+                    id={optionId(index)}
                     active={index === activeIndex}
                     icon="路"
                     title={item.roadNumber}
@@ -238,7 +243,7 @@ export default function CameraSearchBar({
                 return (
                   <SuggestionButton
                     key={`${item.areaType}:${item.value}`}
-                    id={`camera-search-option-${index}`}
+                    id={optionId(index)}
                     active={index === activeIndex}
                     icon="地"
                     title={item.label}
@@ -260,7 +265,7 @@ export default function CameraSearchBar({
                 return (
                   <SuggestionButton
                     key={item.camera.id}
-                    id={`camera-search-option-${index}`}
+                    id={optionId(index)}
                     active={index === activeIndex}
                     icon="影"
                     title={item.camera.name}
