@@ -6,55 +6,52 @@
 
 ## Current task
 
-### M4.2 — 最近觀看
+### M4.3 — Share / URL state
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 使用既有 `useRecentCameras`，最多保留 20 支 Camera。
-- [ ] 手機開啟 Bottom Sheet、桌面開啟 Camera 詳細資訊時記錄最近觀看。
-- [ ] 新增「最近」快速篩選入口，依最近觀看順序排列。
-- [ ] 「收藏」與「最近」特殊篩選互斥，避免狀態混亂。
-- [ ] localStorage 持久化與 SSR safety 不退化。
+- [ ] 將主要搜尋狀態寫入 URL：`q`、`type`、`camera`。
+- [ ] 重新開啟分享網址時恢復搜尋／類型篩選，Camera 資料載入後恢復選取。
+- [ ] Camera 關閉時移除 `camera` query parameter，不重新載入頁面。
+- [ ] 手機分享優先使用 Web Share API；不支援時 fallback 複製網址。
+- [ ] 桌面 Camera 詳細 modal 與手機 Bottom Sheet 都提供分享入口。
+- [ ] 不在本任務加入 road URL；M5 道路模式完成時再加入 `road` / `direction`。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M4.3 — Share / URL state。
+完成後將 Current task 更新成 M5.1 — Road grouping。
 
 ---
 
 ## 已完成任務
 
+### M4.2 — 最近觀看（已完成）
+
+**Executor: ChatGPT**
+
+- [x] 使用 `useRecentCameras`，最多保留 20 支 Camera。
+- [x] 手機開 Bottom Sheet、桌面開 Camera 詳細資訊時寫入最近觀看。
+- [x] 新增「最近」快速篩選，依最近觀看順序排列。
+- [x] 「收藏」與「最近」特殊篩選互斥。
+- [x] 修正 `Map` React 元件名稱遮蔽原生 `Map` 型別問題，改用 `globalThis.Map`。
+- [x] GitHub Actions run `34704005838`：Install dependencies 與 Build 均成功。
+
 ### M4.1 — 收藏（已完成）
 
 **Executor: ChatGPT**
 
-- [x] 將既有 `useFavorites` 接入桌面與手機 UI。
+- [x] 將 `useFavorites` 接入桌面與手機 UI。
 - [x] CameraCard 與 Camera Bottom Sheet 可加入／取消收藏。
 - [x] 桌面 sidebar 與手機 filter chips 可切換「只看收藏」。
 - [x] 收藏持久化於 `taiwan-live-traffic:favorites`。
 - [x] 移除 CameraCard 無條件顯示的紅色 LIVE 點，避免誤導。
 - [x] GitHub Actions run `34703855243`：Install dependencies 與 Build 均成功。
 
-### M3.2 — Viewport optimization（已完成）
+### M3 — 地圖效能（已完成）
 
-**Executor: ChatGPT**
-
-- [x] 只處理 viewport + 35% buffer 內的 Camera。
-- [x] 使用 marker key/signature 做差異更新，不再每次移動完整 clear/recreate。
-- [x] 使用 requestAnimationFrame 合併拖曳／縮放後的更新。
-- [x] cluster 與 Camera click/hover 行為維持。
-- [x] GitHub Actions run `34703721411`：Install dependencies 與 Build 均成功。
-
-### M3.1 — Marker clustering（已完成）
-
-**Executor: ChatGPT**
-
-- [x] 移除 50 / 100 / 200 支 Camera 的中心距離截斷策略。
-- [x] 使用 Leaflet 投影座標建立輕量 grid clustering，不新增 npm dependency。
-- [x] cluster marker 顯示 Camera 數量，點擊後逐步放大。
-- [x] 高縮放層級顯示單支 Camera marker，維持 hover preview 與 click 行為。
-- [x] GitHub Actions run `34703638881`：Install dependencies 與 Build 均成功。
+- [x] M3.1 Marker clustering — **ChatGPT**；CI run `34703638881` 成功。
+- [x] M3.2 Viewport optimization — **ChatGPT**；CI run `34703721411` 成功。
 
 ### M2 — UI 2.0（已完成）
 
@@ -88,8 +85,8 @@
 
 ### M4 — 使用者功能
 - [x] M4.1 收藏 — **ChatGPT**
-- [ ] M4.2 最近觀看 — **ChatGPT**
-- [ ] M4.3 Share / URL state
+- [x] M4.2 最近觀看 — **ChatGPT**
+- [ ] M4.3 Share / URL state — **ChatGPT**
 
 ### M5 — 道路模式
 - [ ] M5.1 Road grouping
