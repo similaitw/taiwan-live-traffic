@@ -6,27 +6,32 @@
 
 ## Current task
 
-### M10.1 — Unified map layer controls
+### M10.2 — Mobile layer-panel polish / responsive validation
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 把雷達、雨量、CMS、即時路況、交通事件從多排浮動控制整理成單一「圖層」入口。
-- [ ] 新增獨立 `MapLayerControls` 元件，`Map` 保留資料／狀態管理，不把 Leaflet 邏輯搬進控制元件。
-- [ ] 面板顯示各圖層開關、目前筆數與既有 filter；功能語意與資料來源不得改變。
-- [ ] TDX 未設定時只隱藏不可用圖層，不影響 CWA 雷達／雨量與 CCTV。
-- [ ] 行動版圖層入口不得遮住底部「地圖／清單」切換；面板需可捲動。
-- [ ] 桌面版保持右上角操作；面板收合時只保留一個低干擾按鈕。
-- [ ] `aria-expanded` / label / button semantics 完整。
-- [ ] 不在本任務改 Camera clustering、Bottom Sheet、API 或資料模型。
+- [ ] 行動版圖層按鈕納入 `safe-area-inset-bottom`，避免瀏海／手勢列與底部地圖清單切換遮擋。
+- [ ] 面板高度改以 dynamic viewport 限制，短螢幕仍可完整捲動。
+- [ ] Escape 可收合面板；面板使用適當 region / aria label。
+- [ ] 保持 ≥44px 的主要觸控目標，select 與 toggle 在窄螢幕不溢出。
+- [ ] 375 / 768 / 1280 layout 以程式碼與可用執行環境檢查；若瀏覽器環境不可用需明確記錄，不得宣稱已做視覺驗證。
+- [ ] 不改資料來源、圖層語意或 API。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M10.2 — Mobile layer-panel polish / visual validation。
+完成後將 Current task 更新成 M10.3 — Layer preferences persistence。
 
 ---
 
 ## 已完成任務
+
+### M10.1 — Unified map layer controls（已完成）
+- [x] 新增 `MapLayerControls`，多排浮動控制收成單一圖層入口。
+- [x] 天氣、路況、事件、CMS 開關與既有 filters 保留。
+- [x] `Map` 保留資料／狀態管理；Leaflet 邏輯未搬入控制元件。
+- [x] 不可用的 TDX/CMS 圖層自動隱藏，CWA/CCTV 不受影響。
+- [x] GitHub Actions run `34709009247` 成功。
 
 ### M9 — 天氣／降雨（已完成）
 - [x] M9.1 CWA rainfall observation foundation — CI `34708540549`
@@ -100,12 +105,12 @@
 - [x] M9.3
 
 ### M10 — 圖層控制與行動版整理
-- [ ] M10.1 Unified map layer controls — **ChatGPT**
-- [ ] M10.2 Mobile layer-panel polish / visual validation
-- [ ] M10.3 Layer preferences persistence（候選）
+- [x] M10.1 Unified map layer controls
+- [ ] M10.2 Mobile layer-panel polish / responsive validation — **ChatGPT**
+- [ ] M10.3 Layer preferences persistence
 
 ---
 
 ## Executor 原則
 
-預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions處理。
+預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions 處理。
