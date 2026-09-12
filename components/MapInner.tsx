@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Camera } from '@/types/camera';
 import type { TrafficEvent } from '@/types/traffic-event';
+import { getDistance } from '@/lib/geo';
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -43,6 +44,11 @@ interface RenderedMarker {
   signature: string;
 }
 
+interface NearestCamera {
+  camera: Camera;
+  distance: number;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -62,6 +68,12 @@ function formatEventTime(value?: string): string | undefined {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function formatDistance(distance: number): string {
+  return distance < 1000
+    ? `${Math.round(distance)} m`
+    : `${(distance / 1000).toFixed(1)} km`;
 }
 
 function makeIcon(type: Camera['type']): L.DivIcon {
@@ -184,7 +196,7 @@ function clusterSignature(cluster: CameraCluster): string {
   return cluster.cameras.map((camera) => camera.id).sort().join('|');
 }
 
-function eventSignature(event: TrafficEvent): string {
+function eventSignature(event: TrafficEvent, nearest: NearestCamera | null): string {
   return [
     event.id,
     event.severity,
@@ -193,6 +205,8 @@ function eventSignature(event: TrafficEvent): string {
     event.title,
     event.description,
     event.publishTime,
+    nearest?.camera.id,
+    nearest ? Math.round(nearest.distance) : undefined,
   ].join('|');
 }
 
@@ -416,7 +430,126 @@ export default function MapInner({
     const map = mapRef.current;
     const layer = eventLayerRef.current;
 
-    const createEventMarker = (event: TrafficEvent): L.Marker => {
+    const findNearestCamera = (event: TrafficEvent): NearestCamera | null => {
+      if (typeof event.lat !== 'number' || typeof event.lng !== 'number') return null;
+
+      let nearest: NearestCamera | null = null;
+      for (const camera of cameras) {
+        const distance = getDistance(event.lat, event.lng, camera.lat, camera.lng);
+        if (!nearest || distance < nearest.distance) {
+          nearest = { camera, distance };
+        }
+      }
+      return nearest;
+    };
+
+    const createEventPopup = (event: TrafficEvent, nearest: NearestCamera | null): HTMLElement => {
+      const root = document.createElement('div');
+      root.style.width = '230px';
+      root.style.fontFamily = "'Noto Sans TC',sans-serif";
+
+      const meta = document.createElement('div');
+      meta.style.display = 'flex';
+      meta.style.alignItems = 'center';
+      meta.style.gap = '6px';
+      meta.style.marginBottom = '8px';
+
+      const badge = document.createElement('span');
+      const color = EVENT_COLORS[event.severity];
+      badge.textContent = EVENT_LABELS[event.severity];
+      badge.style.fontSize = '10px';
+      badge.style.fontWeight = '800';
+      badge.style.color = color;
+      badge.style.border = `1px solid ${color}55`;
+      badge.style.background = `${color}18`;
+      badge.style.padding = '2px 7px';
+      badge.style.borderRadius = '9999px';
+      meta.appendChild(badge);
+
+      const provider = document.createElement('span');
+      provider.textContent = 'TDX';
+      provider.style.fontSize = '10px';
+      provider.style.color = '#6b7280';
+      meta.appendChild(provider);
+      root.appendChild(meta);
+
+      const title = document.createElement('div');
+      title.textContent = event.title;
+      title.style.fontSize = '13px';
+      title.style.fontWeight = '800';
+      title.style.lineHeight = '1.45';
+      title.style.color = '#e8ecf4';
+      title.style.marginBottom = '6px';
+      root.appendChild(title);
+
+      if (event.road) {
+        const road = document.createElement('div');
+        road.textContent = `${event.road}${event.direction ? ` · ${event.direction}` : ''}`;
+        road.style.fontSize = '11px';
+        road.style.color = '#9ca3af';
+        road.style.marginBottom = '5px';
+        root.appendChild(road);
+      }
+
+      if (event.description) {
+        const description = document.createElement('div');
+        description.textContent = event.description;
+        description.style.fontSize = '11px';
+        description.style.lineHeight = '1.55';
+        description.style.color = '#cbd5e1';
+        description.style.marginBottom = '6px';
+        root.appendChild(description);
+      }
+
+      const publishTime = formatEventTime(event.publishTime);
+      if (publishTime) {
+        const time = document.createElement('div');
+        time.textContent = `發布 ${publishTime}`;
+        time.style.fontSize = '10px';
+        time.style.color = '#6b7280';
+        time.style.borderTop = '1px solid rgba(255,255,255,0.06)';
+        time.style.paddingTop = '6px';
+        root.appendChild(time);
+      }
+
+      if (nearest && nearest.distance <= 15_000) {
+        const verifier = document.createElement('div');
+        verifier.style.marginTop = '10px';
+        verifier.style.paddingTop = '8px';
+        verifier.style.borderTop = '1px solid rgba(255,255,255,0.08)';
+
+        const cameraInfo = document.createElement('div');
+        cameraInfo.textContent = `最近可見 CCTV：${nearest.camera.name} · ${formatDistance(nearest.distance)}`;
+        cameraInfo.style.fontSize = '10px';
+        cameraInfo.style.lineHeight = '1.45';
+        cameraInfo.style.color = '#9ca3af';
+        cameraInfo.style.marginBottom = '7px';
+        verifier.appendChild(cameraInfo);
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = '查看最近監視器';
+        button.style.width = '100%';
+        button.style.padding = '7px 10px';
+        button.style.borderRadius = '9px';
+        button.style.border = '1px solid rgba(59,130,246,0.5)';
+        button.style.background = 'rgba(59,130,246,0.16)';
+        button.style.color = '#93c5fd';
+        button.style.fontSize = '11px';
+        button.style.fontWeight = '800';
+        button.style.cursor = 'pointer';
+        button.addEventListener('click', () => {
+          map.closePopup();
+          onSelect(nearest.camera);
+        });
+        verifier.appendChild(button);
+        root.appendChild(verifier);
+      }
+
+      return root;
+    };
+
+    const createEventMarker = (event: TrafficEvent, nearest: NearestCamera | null): L.Marker => {
       const marker = L.marker([event.lat!, event.lng!], {
         icon: makeEventIcon(event.severity),
         zIndexOffset: 1600,
@@ -424,27 +557,8 @@ export default function MapInner({
         title: event.title,
       });
 
-      const color = EVENT_COLORS[event.severity];
-      const publishTime = formatEventTime(event.publishTime);
-      const popupContent = `
-        <div style="width:220px;font-family:'Noto Sans TC',sans-serif;">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-            <span style="font-size:10px;font-weight:800;color:${color};border:1px solid ${color}55;background:${color}18;padding:2px 7px;border-radius:9999px;">
-              ${EVENT_LABELS[event.severity]}
-            </span>
-            <span style="font-size:10px;color:#6b7280;">TDX</span>
-          </div>
-          <div style="font-size:13px;font-weight:800;line-height:1.45;color:#e8ecf4;margin-bottom:6px;">
-            ${escapeHtml(event.title)}
-          </div>
-          ${event.road ? `<div style="font-size:11px;color:#9ca3af;margin-bottom:5px;">${escapeHtml(event.road)}${event.direction ? ` · ${escapeHtml(event.direction)}` : ''}</div>` : ''}
-          ${event.description ? `<div style="font-size:11px;line-height:1.55;color:#cbd5e1;margin-bottom:6px;">${escapeHtml(event.description)}</div>` : ''}
-          ${publishTime ? `<div style="font-size:10px;color:#6b7280;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;">發布 ${escapeHtml(publishTime)}</div>` : ''}
-        </div>
-      `;
-
-      marker.bindPopup(popupContent, {
-        maxWidth: 250,
+      marker.bindPopup(createEventPopup(event, nearest), {
+        maxWidth: 260,
         className: 'leaflet-camera-preview',
       });
       return marker;
@@ -460,8 +574,9 @@ export default function MapInner({
       const nextKeys = new Set<string>();
 
       for (const event of visible) {
+        const nearest = findNearestCamera(event);
         const key = `event:${event.id}`;
-        const signature = eventSignature(event);
+        const signature = eventSignature(event, nearest);
         nextKeys.add(key);
         const existing = renderedEventMarkersRef.current.get(key);
 
@@ -472,7 +587,7 @@ export default function MapInner({
           renderedEventMarkersRef.current.delete(key);
         }
 
-        const marker = createEventMarker(event);
+        const marker = createEventMarker(event, nearest);
         marker.addTo(layer);
         renderedEventMarkersRef.current.set(key, { marker, signature });
       }
@@ -504,7 +619,7 @@ export default function MapInner({
         eventRenderFrameRef.current = null;
       }
     };
-  }, [trafficEvents]);
+  }, [cameras, onSelect, trafficEvents]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }
