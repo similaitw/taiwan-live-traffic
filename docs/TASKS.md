@@ -6,26 +6,34 @@
 
 ## Current task
 
-### M12.2 — Trip Mode UI / corridor summary
+### M12.3 — Corridor navigation / share state
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 選定道路時顯示 Trip Mode 沿線摘要，不影響既有道路篩選與 Camera 操作。
-- [ ] 摘要至少呈現 CCTV、壅塞路段、事件、CMS 訊息、附近雨量站與近 1 小時最大雨量。
-- [ ] UI 必須清楚區分「沿線聚合」與真正導航，不宣稱已規劃 A→B 路線。
-- [ ] 手機採可收合摘要，避免遮住 Bottom Sheet／圖層面板；桌面可使用較完整卡片。
-- [ ] TDX unavailable 時仍顯示 Camera / CWA 可用資訊，不把 0 件誤寫成「沒有事件」而忽略資料來源不可用。
-- [ ] Trip Mode summary 使用 `buildRouteCorridor()`，不在 UI 重寫道路聚合邏輯。
-- [ ] 不自動開啟 LIVE；Camera 驗證仍沿用現有 snapshot-first 流程。
+- [ ] 讓 Trip Mode 沿線摘要可分享，沿用既有 URL state，不建立新的登入或後端儲存。
+- [ ] URL 至少保留 `road=`；若加入方向狀態，使用 `direction=` 並與道路模式一致。
+- [ ] 沿線 Camera 導覽沿用 mile 排序與現有 snapshot-first detail，不重複建立另一套 Camera viewer。
+- [ ] 分享按鈕優先 Web Share API，fallback 複製網址。
+- [ ] 重新開啟分享網址後應恢復道路 corridor context；無效 road/direction 必須安全忽略。
+- [ ] 不把 road corridor 宣稱成導航路徑；仍維持「沿線情境」定位。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M12.3 — Corridor navigation / share state。
+完成後 M12 Route / Trip Mode 結案，再評估下一階段。
 
 ---
 
 ## 已完成任務
+
+### M12.2 — Trip Mode UI / corridor summary（已完成）
+- [x] 新增 `components/TripModeSummary.tsx`，提供桌面完整卡片與手機可收合摘要。
+- [x] 單一道路 context 自動顯示沿線摘要，不影響既有 Camera clustering / detail / layer controls。
+- [x] 摘要使用 `buildRouteCorridor()`，呈現目前可見 CCTV、壅塞、事件、CMS、鄰近雨量站與近 1 小時最大雨量。
+- [x] 明確標示「道路情境聚合，非 A→B 導航路線」。
+- [x] TDX unavailable 時顯示不可用／—，仍保留 CCTV / CWA 可用資訊，不把 unavailable 誤當 0。
+- [x] 不新增 API fetch、不自動開 LIVE；重用 Map 已載入資料與既有 snapshot-first 流程。
+- [x] GitHub Actions run `34712481748` 成功。
 
 ### M12.1 — Route corridor / Trip Mode foundation（已完成）
 - [x] 新增 `types/route-corridor.ts` 共用資料模型。
@@ -164,11 +172,11 @@
 
 ### M12 — Route / Trip Mode
 - [x] M12.1 Route corridor foundation
-- [ ] M12.2 Trip Mode UI / corridor summary — **ChatGPT**
-- [ ] M12.3 Corridor navigation / share state
+- [x] M12.2 Trip Mode UI / corridor summary
+- [ ] M12.3 Corridor navigation / share state — **ChatGPT**
 
 ---
 
 ## Executor 原則
 
-預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions處理。
+預設：`ChatGPT`。只有大型跨檔重構、複雜除錯、必須依賴完整本機／瀏覽器 agent、或 ChatGPT 無法可靠完成與驗證時，才標示 `Executor: Codex`。一般 build 由 GitHub Actions 處理。
