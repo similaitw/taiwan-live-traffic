@@ -6,26 +6,36 @@
 
 ## Current task
 
-### M13.1 — Search V2 matching foundation
+### M13.2 — Categorized search suggestions
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 建立共用 Camera 搜尋 utility，不再把欄位比對邏輯散落在 `app/page.tsx`。
-- [ ] 搜尋至少支援：Camera 名稱、ID、道路名稱、道路編號、縣市、行政區、公里數、方向與 tags。
-- [ ] 查詢與資料文字採 NFKC / trim / case-insensitive 正規化；臺／台差異不得影響道路與地區常見搜尋。
-- [ ] 公里數搜尋支援常見 `38K` / `38.2K` / `38+200` 等輸入，不要求使用者完全符合來源格式。
-- [ ] 回傳可供下一階段分類建議使用的 match metadata，但 M13.1 不改現有搜尋 UI。
-- [ ] 空查詢維持顯示全部 Camera；不破壞道路、收藏、最近、附近等既有 filter。
-- [ ] 不導入外部搜尋服務或新狀態管理套件。
+- [ ] 搜尋輸入時顯示分類建議，至少包含「道路」「地區」「監視器」。
+- [ ] 建議資料使用 M13.1 `searchCameras()` / match metadata，不另寫第二套 matcher。
+- [ ] 道路建議依 roadNumber 去重；地區建議依 county / district 去重；Camera 建議依搜尋分數排序。
+- [ ] 每類限制合理筆數，手機面板不可遮滿整個 viewport。
+- [ ] 點道路建議套用既有道路模式；點地區建議填入搜尋文字；點 Camera 建議沿用既有 snapshot-first detail workflow。
+- [ ] 支援鍵盤基本操作與 Escape 關閉建議面板；不破壞原本搜尋輸入。
+- [ ] 不新增外部搜尋服務或 API。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M13.2 — Categorized search suggestions。
+完成後將 Current task 更新成 M13.3 — Search selection / URL polish。
 
 ---
 
 ## 已完成任務
+
+### M13.1 — Search V2 matching foundation（已完成）
+- [x] 新增 `lib/camera-search.ts` 共用 matcher，首頁不再自行硬編碼 name / id / road 比對。
+- [x] 搜尋支援 Camera 名稱、ID、道路、道路編號、縣市、行政區、公里數、方向與 tags。
+- [x] NFKC、case-insensitive、臺／台正規化，並支援跨欄位多 token 查詢。
+- [x] mile aliases 支援 `38K`、`38.2K`、`38+200`、`38K+200` 等常見格式。
+- [x] matcher 回傳 matched fields / score，提供後續分類建議與排序使用。
+- [x] 空查詢仍顯示全部；道路、收藏、最近、附近等既有 filter 順序與語意維持不變。
+- [x] 未導入外部搜尋服務或新狀態管理套件。
+- [x] GitHub Actions run `34724600973` 成功。
 
 ### M12.3 — Corridor navigation / share state（已完成）
 - [x] Trip Mode 新增沿線分享按鈕；支援 Web Share API，fallback 複製網址。
@@ -187,8 +197,8 @@
 - [x] M12.3 Corridor navigation / share state
 
 ### M13 — Search V2
-- [ ] M13.1 Search matching foundation — **ChatGPT**
-- [ ] M13.2 Categorized search suggestions
+- [x] M13.1 Search matching foundation
+- [ ] M13.2 Categorized search suggestions — **ChatGPT**
 - [ ] M13.3 Search selection / URL polish
 
 ---
