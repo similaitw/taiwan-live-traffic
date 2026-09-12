@@ -6,44 +6,41 @@
 
 ## Current task
 
-### M7.1 — Freeway live traffic foundation
+### M7.2 — Freeway section metadata / shape join
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 新增高速公路即時路況 normalized model。
-- [ ] 串接 TDX `GET /api/basic/v2/Road/Traffic/Live/Freeway`，沿用既有 server-side OAuth helper。
-- [ ] 正規化 `SectionID`、`TravelTime`、`TravelSpeed`、`CongestionLevelID`、`CongestionLevel`、`DataCollectTime`。
-- [ ] parser 兼容裸 array、`LiveTraffics`、`LiveTraffic`、`LiveTrafficList` 等常見 envelope，不依賴單一回傳包裝。
-- [ ] 新增 `/api/traffic-flow`，快取約 60 秒。
-- [ ] 未設定 TDX 金鑰或上游暫時失敗時 graceful degradation，不影響 Camera / traffic-events 功能。
-- [ ] 本任務不猜測 SectionID 的地理位置；geometry join 留給 M7.2。
+- [ ] 串接 TDX `Road/Traffic/Section/Freeway` 與 `Road/Traffic/SectionShape/Freeway`。
+- [ ] 以 `SectionID` 合併發布路段 metadata 與 geometry。
+- [ ] shape parser 支援 WKT `LINESTRING` / `MULTILINESTRING`，轉為 Leaflet 可直接使用的 `[lat, lng][]` 線段。
+- [ ] metadata 欄位保持寬鬆 optional；至少保留可取得的 RoadID / RoadName / RoadDirection / SectionName / Start / End。
+- [ ] 新增 `/api/traffic-sections`，靜態資料使用長時間 cache（數小時）。
+- [ ] 任一靜態來源暫時失敗時 graceful degradation；不得阻斷 Camera 或即時路況 API。
+- [ ] 不在本任務渲染 congestion polyline；留給 M7.3。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M7.2 — Freeway section metadata / shape join。
+完成後將 Current task 更新成 M7.3 — Congestion map overlay / Camera verification。
 
 ---
 
 ## 已完成任務
 
-### M6.3 — Event filters / Camera verification workflow（已完成）
+### M7.1 — Freeway live traffic foundation（已完成）
 
-- [x] 交通事件支援「全部／警示以上／嚴重」篩選。
-- [x] 事件 popup 尋找最近的目前可見 CCTV。
-- [x] 15 km 內顯示 Camera 名稱、距離與「查看最近監視器」。
-- [x] 點驗證按鈕沿用既有 Camera `onSelect`，不建立平行流程。
-- [x] 沒有合理距離 Camera 時不顯示驗證操作。
-- [x] 交通事件不混入 Camera 收藏／最近觀看。
-- [x] GitHub Actions run `34704931928` 成功。
+- [x] 新增 `TrafficFlowSegment` normalized model。
+- [x] 串接 TDX `/api/basic/v2/Road/Traffic/Live/Freeway`。
+- [x] 正規化 SectionID、旅行時間、速度、壅塞等級與資料時間。
+- [x] parser 兼容裸 array / LiveTraffics / LiveTraffic / LiveTrafficList 等 envelope。
+- [x] 新增 `/api/traffic-flow`，60 秒 cache 與 graceful degradation。
+- [x] 未猜測 SectionID geometry。
+- [x] GitHub Actions run `34705057134` 成功。
 
-### M6.2 — Traffic event map overlay（已完成）
-- [x] 事件獨立 Leaflet layer、切換、severity 視覺與 popup。
-- [x] CI `34704812771` 成功。
-
-### M6.1 — TDX road-event foundation（已完成）
-- [x] TDX OAuth、事件 model、adapter、`/api/traffic-events` 與 graceful degradation。
-- [x] CI `34704685825` 成功。
+### M6 — 即時交通事件（已完成）
+- [x] M6.1 TDX road-event foundation — CI `34704685825`
+- [x] M6.2 Traffic event map overlay — CI `34704812771`
+- [x] M6.3 Event filters / Camera verification workflow — CI `34704931928`
 
 ### M5 — 道路模式（已完成）
 - [x] M5.1 Road grouping — CI `34704232348`
@@ -81,13 +78,13 @@
 - [x] M5 道路模式
 
 ### M6 — 即時交通事件
-- [x] M6.1 TDX road-event foundation
-- [x] M6.2 Traffic event map overlay
-- [x] M6.3 Event filters / Camera verification workflow
+- [x] M6.1
+- [x] M6.2
+- [x] M6.3
 
 ### M7 — 壅塞／旅行速度
-- [ ] M7.1 Freeway live traffic foundation — **ChatGPT**
-- [ ] M7.2 Freeway section metadata / shape join
+- [x] M7.1 Freeway live traffic foundation
+- [ ] M7.2 Freeway section metadata / shape join — **ChatGPT**
 - [ ] M7.3 Congestion map overlay / Camera verification
 
 ### M8 — 後續路況深化（暫定）
