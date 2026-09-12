@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { Camera } from '@/types/camera';
 import { getDistance } from '@/lib/geo';
+import { getCameraRoadNumber, groupCamerasByRoad } from '@/lib/roads';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useRecentCameras } from '@/hooks/useRecentCameras';
@@ -11,6 +12,7 @@ import CameraList from '@/components/CameraList';
 import CameraModal from '@/components/CameraModal';
 import CameraBottomSheet from '@/components/CameraBottomSheet';
 import CameraShareButton from '@/components/CameraShareButton';
+import RoadFilter from '@/components/RoadFilter';
 import Map from '@/components/Map';
 
 type View = 'map' | 'list';
@@ -47,6 +49,7 @@ export default function HomePage() {
   const [mobileSelected, setMobileSelected] = useState<Camera | null>(null);
   const [liveCamera, setLiveCamera] = useState<Camera | null>(null);
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
+  const [selectedRoad, setSelectedRoad] = useState<string | null>(null);
   const [sortByNearest, setSortByNearest] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [recentOnly, setRecentOnly] = useState(false);
@@ -60,6 +63,8 @@ export default function HomePage() {
     error: geolocationError,
     locate: locateMe,
   } = useGeolocation({ autoLocate: true });
+
+  const roadGroups = useMemo(() => groupCamerasByRoad(cameras), [cameras]);
 
   const updateUrl = useCallback((updates: Record<string, string | null>) => {
     if (typeof window === 'undefined') return;
@@ -76,6 +81,7 @@ export default function HomePage() {
     setQuery(params.get('q') ?? '');
     const type = params.get('type');
     if (validCameraType(type)) setTypeFilter(type);
+    setSelectedRoad(params.get('road'));
     pendingCameraIdRef.current = params.get('camera');
     setUrlReady(true);
   }, []);
@@ -96,8 +102,16 @@ export default function HomePage() {
     updateUrl({
       q: query.trim() || null,
       type: typeFilter === 'all' ? null : typeFilter,
+      road: selectedRoad,
     });
-  }, [query, typeFilter, updateUrl, urlReady]);
+  }, [query, selectedRoad, typeFilter, updateUrl, urlReady]);
+
+  useEffect(() => {
+    if (loading || !selectedRoad || roadGroups.length === 0) return;
+    if (!roadGroups.some((group) => group.roadNumber === selectedRoad)) {
+      setSelectedRoad(null);
+    }
+  }, [loading, roadGroups, selectedRoad]);
 
   useEffect(() => {
     if (!urlReady || loading || cameras.length === 0) return;
@@ -162,6 +176,7 @@ export default function HomePage() {
 
   const filtered = cameras
     .filter((camera) => {
+      if (selectedRoad && getCameraRoadNumber(camera) !== selectedRoad) return false;
       if (favoritesOnly && !favoriteIdSet.has(camera.id)) return false;
       if (recentOnly && !recentIdSet.has(camera.id)) return false;
       if (typeFilter !== 'all' && camera.type !== typeFilter) return false;
@@ -170,7 +185,8 @@ export default function HomePage() {
       return (
         camera.name.toLowerCase().includes(q) ||
         camera.id.toLowerCase().includes(q) ||
-        (camera.road?.toLowerCase().includes(q) ?? false)
+        (camera.road?.toLowerCase().includes(q) ?? false) ||
+        (camera.roadNumber?.toLowerCase().includes(q) ?? false)
       );
     })
     .map((camera) => {
@@ -323,6 +339,7 @@ export default function HomePage() {
                   {typeChips()}
                   {favoriteChip()}
                   {recentChip()}
+                  <RoadFilter groups={roadGroups} value={selectedRoad} onChange={setSelectedRoad} />
                 </div>
 
                 <div className="flex items-center gap-2 mt-3">
@@ -399,6 +416,7 @@ export default function HomePage() {
               {typeChips(true)}
               {favoriteChip(true)}
               {recentChip(true)}
+              <RoadFilter groups={roadGroups} value={selectedRoad} onChange={setSelectedRoad} compact />
             </div>
 
             <div className="absolute right-3 top-[8.25rem] z-40 flex flex-col items-end gap-2">
