@@ -6,26 +6,36 @@
 
 ## Current task
 
-### M11.4 — Production diagnostics / deploy checklist
+### M12.1 — Route corridor / Trip Mode foundation
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 新增 production deploy checklist，明確列出 GitHub CI、Vercel env、TDX、CWA、Camera API、proxy 與正式站 smoke check。
-- [ ] 提供不洩漏 secrets 的 server-side health / diagnostics 輸出，至少能辨識 TDX credentials 是否已設定與主要 API 是否可用。
-- [ ] health endpoint 不主動大量打上游；優先回報設定、版本／時間與安全狀態，避免自己成為額外負載來源。
-- [ ] 文件記錄 CWA rainfall / radar 使用公開官方 OpenData，無需另外設定 CWA API key。
-- [ ] 文件記錄 TDX 功能需要 `TDX_CLIENT_ID` / `TDX_CLIENT_SECRET`，但任何診斷輸出不得回傳實際值。
-- [ ] 列出正式站至少需驗證 375px / 768px / 1280px、Camera snapshot、手動 live、圖層面板、事件／路況／CMS／雨量 graceful degradation。
-- [ ] 記錄目前此 ChatGPT 執行環境無法直接取得使用者 Vercel team / production URL，因此正式站瀏覽器 smoke check 必須在可取得 deployment URL 的環境補跑，不可假裝已完成。
+- [ ] 建立共用 route-corridor model，先以現有道路模式為基礎，不導入外部導航服務。
+- [ ] 對選定道路／方向整合沿線 Camera、即時壅塞路段、道路事件、CMS 與附近雨量觀測資訊。
+- [ ] 產生中性、可驗證的沿線摘要資料：Camera 數、壅塞路段數、事件數、CMS 訊息數、雨量狀態。
+- [ ] 不以直線距離假裝成導航路徑；M12.1 只做 road corridor aggregation。
+- [ ] 資料缺失必須 graceful degradation；TDX 未設定時仍可使用 Camera / CWA 部分資訊。
+- [ ] route corridor 計算抽成共用 utility，不把聚合邏輯直接塞進 UI component。
+- [ ] 不改變既有 Camera / traffic / CMS / rainfall API response shape。
 - [ ] GitHub Actions CI build 通過。
 
-完成後 M11 Production hardening 結案，再評估是否進 M12。
+完成後將 Current task 更新成 M12.2 — Trip Mode UI / corridor summary。
 
 ---
 
 ## 已完成任務
+
+### M11.4 — Production diagnostics / deploy checklist（已完成）
+- [x] 新增 `docs/PRODUCTION_CHECKLIST.md`，涵蓋 GitHub CI、Vercel env、TDX、CWA、Camera API、proxy 與正式站 smoke check。
+- [x] 新增被動 `/api/health`，不主動 probe upstream，不製造額外 TDX / CWA / CCTV 負載。
+- [x] health 只回報 TDX credentials 是否 configured，不回傳 Client ID / Secret 實際值。
+- [x] health 回報 deployment environment / commit、CWA public OpenData 與 Camera proxy guardrails。
+- [x] `.env.example` 明確記錄 TDX server-side env 與 CWA 無需 API key。
+- [x] 正式站 checklist 明列 375px / 768px / 1280px、snapshot、手動 live、圖層面板與 graceful degradation。
+- [x] 文件記錄目前 ChatGPT 執行環境無法取得 Vercel team / production URL，因此正式站瀏覽器 smoke check 不冒充已完成。
+- [x] GitHub Actions run `34712218377` 成功。
 
 ### M11.3 — Live stream bandwidth / lifecycle guardrails（已完成）
 - [x] repo 僅 `CameraModal` 使用 `/api/proxy/image`；卡片、地圖 hover、Bottom Sheet 維持 snapshot。
@@ -140,7 +150,12 @@
 - [x] M11.1 Camera proxy redirect / SSRF hardening
 - [x] M11.2 Source freshness / health visibility
 - [x] M11.3 Live stream bandwidth / lifecycle guardrails
-- [ ] M11.4 Production diagnostics / deploy checklist — **ChatGPT**
+- [x] M11.4 Production diagnostics / deploy checklist
+
+### M12 — Route / Trip Mode
+- [ ] M12.1 Route corridor foundation — **ChatGPT**
+- [ ] M12.2 Trip Mode UI / corridor summary
+- [ ] M12.3 Corridor navigation / share state
 
 ---
 
