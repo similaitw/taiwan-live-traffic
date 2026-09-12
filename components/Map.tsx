@@ -19,12 +19,41 @@ import MapLayerControls, {
 
 const MapInner = dynamic(() => import('./MapInner'), { ssr: false });
 const RADAR_IMAGE_URL = 'https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-006.png';
+const LAYER_PREFERENCES_KEY = 'taiwan-live-traffic:map-layers:v1';
 
 interface Props {
   cameras: Camera[];
   query: string;
   onSelect: (c: Camera) => void;
   userLocation?: { lat: number; lng: number } | null;
+}
+
+interface StoredLayerPreferences {
+  showRadar?: boolean;
+  showRainfall?: boolean;
+  rainfallFilter?: RainfallLayerFilter;
+  showCms?: boolean;
+  cmsFilter?: CmsLayerFilter;
+  showTrafficFlow?: boolean;
+  flowFilter?: FlowLayerFilter;
+  showTrafficEvents?: boolean;
+  eventFilter?: EventLayerFilter;
+}
+
+function isRainfallFilter(value: unknown): value is RainfallLayerFilter {
+  return value === 'rainy' || value === 'all';
+}
+
+function isCmsFilter(value: unknown): value is CmsLayerFilter {
+  return value === 'active' || value === 'all' || value === 'abnormal';
+}
+
+function isFlowFilter(value: unknown): value is FlowLayerFilter {
+  return value === 'all' || value === 'congested';
+}
+
+function isEventFilter(value: unknown): value is EventLayerFilter {
+  return value === 'all' || value === 'important' || value === 'serious';
 }
 
 export default function Map({ cameras, query, onSelect, userLocation }: Props) {
@@ -51,6 +80,59 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   const [rainfallFilter, setRainfallFilter] = useState<RainfallLayerFilter>('rainy');
   const [showRadar, setShowRadar] = useState(false);
   const [radarVersion, setRadarVersion] = useState(0);
+  const [layerPreferencesReady, setLayerPreferencesReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LAYER_PREFERENCES_KEY);
+      if (!raw) return;
+      const preferences = JSON.parse(raw) as StoredLayerPreferences;
+      if (typeof preferences.showRadar === 'boolean') setShowRadar(preferences.showRadar);
+      if (typeof preferences.showRainfall === 'boolean') setShowRainfall(preferences.showRainfall);
+      if (isRainfallFilter(preferences.rainfallFilter)) setRainfallFilter(preferences.rainfallFilter);
+      if (typeof preferences.showCms === 'boolean') setShowCms(preferences.showCms);
+      if (isCmsFilter(preferences.cmsFilter)) setCmsFilter(preferences.cmsFilter);
+      if (typeof preferences.showTrafficFlow === 'boolean') setShowTrafficFlow(preferences.showTrafficFlow);
+      if (isFlowFilter(preferences.flowFilter)) setFlowFilter(preferences.flowFilter);
+      if (typeof preferences.showTrafficEvents === 'boolean') setShowTrafficEvents(preferences.showTrafficEvents);
+      if (isEventFilter(preferences.eventFilter)) setEventFilter(preferences.eventFilter);
+    } catch {
+      // Invalid or unavailable localStorage falls back to safe defaults.
+    } finally {
+      setLayerPreferencesReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!layerPreferencesReady) return;
+    const preferences: StoredLayerPreferences = {
+      showRadar,
+      showRainfall,
+      rainfallFilter,
+      showCms,
+      cmsFilter,
+      showTrafficFlow,
+      flowFilter,
+      showTrafficEvents,
+      eventFilter,
+    };
+    try {
+      window.localStorage.setItem(LAYER_PREFERENCES_KEY, JSON.stringify(preferences));
+    } catch {
+      // Browsing mode or quota restrictions must not affect the map.
+    }
+  }, [
+    cmsFilter,
+    eventFilter,
+    flowFilter,
+    layerPreferencesReady,
+    rainfallFilter,
+    showCms,
+    showRadar,
+    showRainfall,
+    showTrafficEvents,
+    showTrafficFlow,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
