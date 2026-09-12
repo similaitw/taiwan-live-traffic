@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export type EventLayerFilter = 'all' | 'important' | 'serious';
 export type FlowLayerFilter = 'all' | 'congested';
@@ -61,7 +61,7 @@ function LayerToggle({ label, icon, active, onClick, count, accent }: LayerToggl
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className="w-full flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-all"
+      className="min-h-11 w-full flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-all"
       style={{
         background: active ? `${accent}18` : 'rgba(255,255,255,0.03)',
         border: `1px solid ${active ? `${accent}66` : 'var(--border-subtle)'}`,
@@ -91,7 +91,7 @@ function LayerToggle({ label, icon, active, onClick, count, accent }: LayerToggl
   );
 }
 
-const selectClass = 'h-9 min-w-0 flex-1 rounded-lg px-2.5 text-[11px] font-bold outline-none';
+const selectClass = 'h-11 min-w-0 flex-1 rounded-lg px-2.5 text-[11px] font-bold outline-none';
 const selectStyle = {
   background: 'rgba(255,255,255,0.04)',
   color: 'var(--text-secondary)',
@@ -100,6 +100,16 @@ const selectStyle = {
 
 export default function MapLayerControls(props: Props) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
+
   const availableLayerCount = 1
     + (props.rainfallEnabled ? 1 : 0)
     + (props.cmsEnabled ? 1 : 0)
@@ -112,12 +122,15 @@ export default function MapLayerControls(props: Props) {
     + Number(props.eventsEnabled && props.showEvents);
 
   return (
-    <div className="pointer-events-none absolute bottom-[4.75rem] right-3 z-[900] flex flex-col items-end gap-2 md:bottom-auto md:top-3">
+    <div className="pointer-events-none absolute bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-[900] flex flex-col items-end gap-2 md:bottom-auto md:top-3">
       {open && (
         <div
           id="map-layer-panel"
-          className="pointer-events-auto w-[min(21rem,calc(100vw-1.5rem))] max-h-[min(62vh,34rem)] overflow-y-auto rounded-2xl p-3 backdrop-blur-xl"
+          role="region"
+          aria-label="地圖圖層設定"
+          className="pointer-events-auto w-[min(21rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl p-3 backdrop-blur-xl"
           style={{
+            maxHeight: 'min(62dvh, 34rem)',
             background: 'rgba(10,14,26,0.94)',
             border: '1px solid var(--border-subtle)',
             boxShadow: '0 18px 45px rgba(0,0,0,0.45)',
@@ -134,7 +147,7 @@ export default function MapLayerControls(props: Props) {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="關閉圖層面板"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg"
               style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
             >
               ×
@@ -220,7 +233,7 @@ export default function MapLayerControls(props: Props) {
               <div className="space-y-1.5">
                 <LayerToggle label="CMS 官方看板" icon="📢" active={props.showCms} onClick={props.onToggleCms} count={props.showCms ? props.cmsCount : props.cmsTotal} accent="#06b6d4" />
                 {props.showCms && props.cmsTotal > 0 && (
-                  <div className="grid grid-cols-2 gap-2 px-1 pb-1">
+                  <div className="grid grid-cols-2 gap-2 px-1 pb-1 max-[360px]:grid-cols-1">
                     <select
                       value={props.cmsFilter}
                       onChange={(event) => props.onCmsFilterChange(event.target.value as CmsLayerFilter)}
@@ -256,7 +269,7 @@ export default function MapLayerControls(props: Props) {
         aria-expanded={open}
         aria-controls="map-layer-panel"
         aria-label={open ? '收合地圖圖層' : '開啟地圖圖層'}
-        className="pointer-events-auto flex h-11 items-center gap-2 rounded-full px-3.5 text-xs font-black backdrop-blur-xl transition-all"
+        className="pointer-events-auto flex h-11 min-w-11 items-center gap-2 rounded-full px-3.5 text-xs font-black backdrop-blur-xl transition-all"
         style={{
           background: open ? 'rgba(59,130,246,0.94)' : 'rgba(10,14,26,0.88)',
           color: '#fff',
