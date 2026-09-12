@@ -14,6 +14,7 @@ import CameraBottomSheet from '@/components/CameraBottomSheet';
 import CameraShareButton from '@/components/CameraShareButton';
 import RoadFilter from '@/components/RoadFilter';
 import RoadCameraNavigator from '@/components/RoadCameraNavigator';
+import NearbyFilter, { type NearbyRadius } from '@/components/NearbyFilter';
 import Map from '@/components/Map';
 
 type View = 'map' | 'list';
@@ -41,6 +42,10 @@ function validCameraType(value: string | null): value is Camera['type'] {
   return value === 'freeway' || value === 'provincial' || value === 'county';
 }
 
+function parseNearbyRadius(value: string | null): NearbyRadius | null {
+  return value === '5' || value === '10' || value === '20' ? Number(value) as NearbyRadius : null;
+}
+
 export default function HomePage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +56,7 @@ export default function HomePage() {
   const [liveCamera, setLiveCamera] = useState<Camera | null>(null);
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
   const [selectedRoad, setSelectedRoad] = useState<string | null>(null);
+  const [nearbyRadius, setNearbyRadius] = useState<NearbyRadius | null>(null);
   const [sortByNearest, setSortByNearest] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [recentOnly, setRecentOnly] = useState(false);
@@ -91,6 +97,7 @@ export default function HomePage() {
     const type = params.get('type');
     if (validCameraType(type)) setTypeFilter(type);
     setSelectedRoad(params.get('road'));
+    setNearbyRadius(parseNearbyRadius(params.get('nearby')));
     pendingCameraIdRef.current = params.get('camera');
     setUrlReady(true);
   }, []);
@@ -112,8 +119,9 @@ export default function HomePage() {
       q: query.trim() || null,
       type: typeFilter === 'all' ? null : typeFilter,
       road: selectedRoad,
+      nearby: nearbyRadius ? String(nearbyRadius) : null,
     });
-  }, [query, selectedRoad, typeFilter, updateUrl, urlReady]);
+  }, [nearbyRadius, query, selectedRoad, typeFilter, updateUrl, urlReady]);
 
   useEffect(() => {
     if (loading || !selectedRoad || roadGroups.length === 0) return;
@@ -177,6 +185,11 @@ export default function HomePage() {
     [toggleFavorite]
   );
 
+  const handleNearbyChange = useCallback((radius: NearbyRadius | null) => {
+    setNearbyRadius(radius);
+    if (radius && !userLocation) locateMe();
+  }, [locateMe, userLocation]);
+
   const favoriteIdSet = new Set(favoriteIds);
   const recentIdSet = new Set(recentIds);
   const recentRank = new globalThis.Map<string, number>(
@@ -204,15 +217,18 @@ export default function HomePage() {
         camera,
         distance: getDistance(userLocation.lat, userLocation.lng, camera.lat, camera.lng),
       };
-    });
+    })
+    .filter((item) => nearbyRadius === null || (userLocation !== null && item.distance <= nearbyRadius * 1000));
 
-  const sorted = sortByNearest && userLocation
+  const sorted = nearbyRadius && userLocation
     ? [...filtered].sort((a, b) => a.distance - b.distance)
-    : recentOnly
-      ? [...filtered].sort(
-          (a, b) => (recentRank.get(a.camera.id) ?? Number.MAX_SAFE_INTEGER) - (recentRank.get(b.camera.id) ?? Number.MAX_SAFE_INTEGER)
-        )
-      : filtered;
+    : sortByNearest && userLocation
+      ? [...filtered].sort((a, b) => a.distance - b.distance)
+      : recentOnly
+        ? [...filtered].sort(
+            (a, b) => (recentRank.get(a.camera.id) ?? Number.MAX_SAFE_INTEGER) - (recentRank.get(b.camera.id) ?? Number.MAX_SAFE_INTEGER)
+          )
+        : filtered;
 
   const filteredCameras = sorted.map((item) => item.camera);
   const favoriteCount = cameras.filter((camera) => favoriteIdSet.has(camera.id)).length;
@@ -349,6 +365,7 @@ export default function HomePage() {
                   {favoriteChip()}
                   {recentChip()}
                   <RoadFilter groups={roadGroups} value={selectedRoad} onChange={setSelectedRoad} />
+                  <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} />
                 </div>
 
                 <div className="flex items-center gap-2 mt-3">
@@ -367,19 +384,24 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => setSortByNearest((value) => !value)}
-                    disabled={!userLocation}
+                    disabled={!userLocation || nearbyRadius !== null}
                     className="flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all"
                     style={{
-                      background: sortByNearest ? 'var(--accent-freeway)' : 'rgba(255,255,255,0.04)',
-                      color: sortByNearest ? '#fff' : 'var(--text-secondary)',
-                      border: `1px solid ${sortByNearest ? 'var(--accent-freeway)' : 'var(--border-subtle)'}`,
-                      opacity: userLocation ? 1 : 0.4,
+                      background: sortByNearest && nearbyRadius === null ? 'var(--accent-freeway)' : 'rgba(255,255,255,0.04)',
+                      color: sortByNearest && nearbyRadius === null ? '#fff' : 'var(--text-secondary)',
+                      border: `1px solid ${sortByNearest && nearbyRadius === null ? 'var(--accent-freeway)' : 'var(--border-subtle)'}`,
+                      opacity: userLocation && nearbyRadius === null ? 1 : 0.4,
                     }}
                   >
                     離我最近
                   </button>
                 </div>
 
+                {nearbyRadius && !userLocation && (
+                  <p className="mt-2 text-xs" style={{ color: 'var(--accent-provincial)' }}>
+                    正在取得位置以顯示 {nearbyRadius} km 內監視器…
+                  </p>
+                )}
                 {userLocation && (
                   <p className="mt-2 text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
                     {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
@@ -426,6 +448,7 @@ export default function HomePage() {
               {favoriteChip(true)}
               {recentChip(true)}
               <RoadFilter groups={roadGroups} value={selectedRoad} onChange={setSelectedRoad} compact />
+              <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} compact />
             </div>
 
             <div className="absolute right-3 top-[8.25rem] z-40 flex flex-col items-end gap-2">
@@ -444,13 +467,13 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => setSortByNearest((value) => !value)}
-                disabled={!userLocation}
+                disabled={!userLocation || nearbyRadius !== null}
                 aria-label="依距離排序"
                 className="h-10 px-3 rounded-full glass shadow-xl text-xs font-bold"
                 style={{
-                  color: sortByNearest ? '#fff' : 'var(--text-secondary)',
-                  background: sortByNearest ? 'var(--accent-freeway)' : 'var(--bg-glass)',
-                  opacity: userLocation ? 1 : 0.45,
+                  color: sortByNearest && nearbyRadius === null ? '#fff' : 'var(--text-secondary)',
+                  background: sortByNearest && nearbyRadius === null ? 'var(--accent-freeway)' : 'var(--bg-glass)',
+                  opacity: userLocation && nearbyRadius === null ? 1 : 0.45,
                 }}
               >
                 最近距離
