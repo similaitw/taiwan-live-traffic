@@ -12,6 +12,7 @@ const MapInner = dynamic(() => import('./MapInner'), { ssr: false });
 
 type EventFilter = 'all' | 'important' | 'serious';
 type FlowFilter = 'all' | 'congested';
+type CmsFilter = 'active' | 'all' | 'abnormal';
 
 interface Props {
   cameras: Camera[];
@@ -35,6 +36,8 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   const [cmsDevices, setCmsDevices] = useState<CmsDevice[]>([]);
   const [cmsEnabled, setCmsEnabled] = useState(false);
   const [showCms, setShowCms] = useState(true);
+  const [cmsFilter, setCmsFilter] = useState<CmsFilter>('active');
+  const [cmsRoad, setCmsRoad] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -113,18 +116,13 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   }, []);
 
   const filteredTrafficEvents = useMemo(() => {
-    if (eventFilter === 'serious') {
-      return trafficEvents.filter((event) => event.severity === 'serious');
-    }
-    if (eventFilter === 'important') {
-      return trafficEvents.filter((event) => event.severity !== 'info');
-    }
+    if (eventFilter === 'serious') return trafficEvents.filter((event) => event.severity === 'serious');
+    if (eventFilter === 'important') return trafficEvents.filter((event) => event.severity !== 'info');
     return trafficEvents;
   }, [eventFilter, trafficEvents]);
 
   const congestionSegments = useMemo<TrafficFlowMapSegment[]>(() => {
     if (!trafficFlow?.enabled || !trafficSections?.enabled) return [];
-
     const sectionById = new globalThis.Map(
       trafficSections.sections.map((section) => [section.sectionId, section] as const),
     );
@@ -148,24 +146,32 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   }, [trafficFlow, trafficSections]);
 
   const filteredCongestionSegments = useMemo(() => {
-    if (flowFilter === 'congested') {
-      return congestionSegments.filter((segment) => (segment.congestionLevel ?? 0) >= 3);
-    }
+    if (flowFilter === 'congested') return congestionSegments.filter((segment) => (segment.congestionLevel ?? 0) >= 3);
     return congestionSegments;
   }, [congestionSegments, flowFilter]);
 
-  const activeCmsDevices = useMemo(
-    () => cmsDevices.filter((device) => device.active && typeof device.lat === 'number' && typeof device.lng === 'number'),
-    [cmsDevices],
-  );
+  const cmsRoadOptions = useMemo(() => {
+    return [...new Set(
+      cmsDevices
+        .map((device) => device.roadName ?? device.roadId)
+        .filter((value): value is string => Boolean(value)),
+    )].sort((a, b) => a.localeCompare(b, 'zh-Hant', { numeric: true }));
+  }, [cmsDevices]);
+
+  const filteredCmsDevices = useMemo(() => {
+    return cmsDevices.filter((device) => {
+      if (typeof device.lat !== 'number' || typeof device.lng !== 'number') return false;
+      if (cmsRoad && (device.roadName ?? device.roadId) !== cmsRoad) return false;
+      if (cmsFilter === 'active') return device.active;
+      if (cmsFilter === 'abnormal') return device.status !== undefined && device.status !== 0;
+      return true;
+    });
+  }, [cmsDevices, cmsFilter, cmsRoad]);
 
   return (
     <div
       className="relative w-full h-full overflow-hidden rounded-none md:rounded-xl"
-      style={{
-        border: '1px solid var(--border-subtle)',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
-      }}
+      style={{ border: '1px solid var(--border-subtle)', boxShadow: '0 4px 24px rgba(0,0,0,0.3)' }}
     >
       <MapInner
         cameras={cameras}
@@ -174,26 +180,50 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         userLocation={userLocation}
         trafficEvents={showTrafficEvents ? filteredTrafficEvents : []}
         trafficFlowSegments={showTrafficFlow ? filteredCongestionSegments : []}
-        cmsDevices={showCms ? activeCmsDevices : []}
+        cmsDevices={showCms ? filteredCmsDevices : []}
       />
 
       {(trafficEnabled || flowEnabled || cmsEnabled) && (
         <div className="absolute right-3 bottom-16 md:bottom-auto md:top-3 z-[900] flex flex-col items-end gap-2">
           {cmsEnabled && (
-            <button
-              type="button"
-              onClick={() => setShowCms((value) => !value)}
-              className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all"
-              style={{
-                background: showCms ? 'rgba(6,182,212,0.92)' : 'rgba(10,14,26,0.86)',
-                color: '#fff',
-                border: `1px solid ${showCms ? 'rgba(34,211,238,0.9)' : 'var(--border-subtle)'}`,
-                boxShadow: '0 8px 22px rgba(0,0,0,0.3)',
-              }}
-              aria-pressed={showCms}
-            >
-              📢 官方看板 {activeCmsDevices.length}
-            </button>
+            <div className="flex flex-wrap justify-end items-center gap-2 max-w-[min(92vw,520px)]">
+              {showCms && cmsDevices.length > 0 && (
+                <>
+                  {cmsRoadOptions.length > 1 && (
+                    <select
+                      value={cmsRoad}
+                      onChange={(event) => setCmsRoad(event.target.value)}
+                      className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl max-w-36"
+                      style={{ background: 'rgba(10,14,26,0.9)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }}
+                      aria-label="官方看板道路"
+                    >
+                      <option value="">全部道路</option>
+                      {cmsRoadOptions.map((road) => <option key={road} value={road}>{road}</option>)}
+                    </select>
+                  )}
+                  <select
+                    value={cmsFilter}
+                    onChange={(event) => setCmsFilter(event.target.value as CmsFilter)}
+                    className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl"
+                    style={{ background: 'rgba(10,14,26,0.9)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }}
+                    aria-label="官方看板篩選"
+                  >
+                    <option value="active">目前顯示</option>
+                    <option value="all">全部設備</option>
+                    <option value="abnormal">異常設備</option>
+                  </select>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowCms((value) => !value)}
+                className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all"
+                style={{ background: showCms ? 'rgba(6,182,212,0.92)' : 'rgba(10,14,26,0.86)', color: '#fff', border: `1px solid ${showCms ? 'rgba(34,211,238,0.9)' : 'var(--border-subtle)'}`, boxShadow: '0 8px 22px rgba(0,0,0,0.3)' }}
+                aria-pressed={showCms}
+              >
+                📢 官方看板 {showCms ? filteredCmsDevices.length : cmsDevices.length}
+              </button>
+            </div>
           )}
 
           {flowEnabled && (
@@ -203,29 +233,18 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
                   value={flowFilter}
                   onChange={(event) => setFlowFilter(event.target.value as FlowFilter)}
                   className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl"
-                  style={{
-                    background: 'rgba(10,14,26,0.9)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border-subtle)',
-                    boxShadow: '0 8px 22px rgba(0,0,0,0.28)',
-                  }}
+                  style={{ background: 'rgba(10,14,26,0.9)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }}
                   aria-label="即時路況篩選"
                 >
                   <option value="all">全部路況</option>
                   <option value="congested">只看壅塞</option>
                 </select>
               )}
-
               <button
                 type="button"
                 onClick={() => setShowTrafficFlow((value) => !value)}
                 className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all"
-                style={{
-                  background: showTrafficFlow ? 'rgba(16,185,129,0.9)' : 'rgba(10,14,26,0.86)',
-                  color: '#fff',
-                  border: `1px solid ${showTrafficFlow ? 'rgba(52,211,153,0.85)' : 'var(--border-subtle)'}`,
-                  boxShadow: '0 8px 22px rgba(0,0,0,0.3)',
-                }}
+                style={{ background: showTrafficFlow ? 'rgba(16,185,129,0.9)' : 'rgba(10,14,26,0.86)', color: '#fff', border: `1px solid ${showTrafficFlow ? 'rgba(52,211,153,0.85)' : 'var(--border-subtle)'}`, boxShadow: '0 8px 22px rgba(0,0,0,0.3)' }}
                 aria-pressed={showTrafficFlow}
               >
                 🚗 即時路況 {showTrafficFlow ? filteredCongestionSegments.length : congestionSegments.length}
@@ -240,12 +259,7 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
                   value={eventFilter}
                   onChange={(event) => setEventFilter(event.target.value as EventFilter)}
                   className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl"
-                  style={{
-                    background: 'rgba(10,14,26,0.9)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border-subtle)',
-                    boxShadow: '0 8px 22px rgba(0,0,0,0.28)',
-                  }}
+                  style={{ background: 'rgba(10,14,26,0.9)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }}
                   aria-label="交通事件嚴重程度"
                 >
                   <option value="all">全部事件</option>
@@ -253,17 +267,11 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
                   <option value="serious">嚴重事件</option>
                 </select>
               )}
-
               <button
                 type="button"
                 onClick={() => setShowTrafficEvents((value) => !value)}
                 className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all"
-                style={{
-                  background: showTrafficEvents ? 'rgba(239,68,68,0.92)' : 'rgba(10,14,26,0.86)',
-                  color: '#fff',
-                  border: `1px solid ${showTrafficEvents ? 'rgba(248,113,113,0.9)' : 'var(--border-subtle)'}`,
-                  boxShadow: '0 8px 22px rgba(0,0,0,0.3)',
-                }}
+                style={{ background: showTrafficEvents ? 'rgba(239,68,68,0.92)' : 'rgba(10,14,26,0.86)', color: '#fff', border: `1px solid ${showTrafficEvents ? 'rgba(248,113,113,0.9)' : 'var(--border-subtle)'}`, boxShadow: '0 8px 22px rgba(0,0,0,0.3)' }}
                 aria-pressed={showTrafficEvents}
               >
                 ⚠ 交通事件 {showTrafficEvents ? filteredTrafficEvents.length : trafficEvents.length}
