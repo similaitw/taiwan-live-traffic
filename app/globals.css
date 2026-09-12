@@ -171,3 +171,15 @@ html, body {
   pointer-events: none;
   z-index: 0;
 }
+
+/* Keep Leaflet controls clear of floating mobile search/filter chrome. */
+@media (max-width: 767px) {
+  .leaflet-top.leaflet-left {
+    top: 7.4rem;
+  }
+
+  .leaflet-control-attribution {
+    max-width: 68vw;
+    line-height: 1.2;
+  }
+}
