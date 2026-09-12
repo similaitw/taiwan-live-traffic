@@ -5,6 +5,7 @@ import type { Camera } from '@/types/camera';
 import { getDistance } from '@/lib/geo';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useRecentCameras } from '@/hooks/useRecentCameras';
 import SearchBar from '@/components/SearchBar';
 import CameraList from '@/components/CameraList';
 import CameraModal from '@/components/CameraModal';
@@ -43,7 +44,9 @@ export default function HomePage() {
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
   const [sortByNearest, setSortByNearest] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [recentOnly, setRecentOnly] = useState(false);
   const { favoriteIds, isFavorite, toggleFavorite } = useFavorites();
+  const { recentIds, addRecent } = useRecentCameras();
   const {
     location: userLocation,
     error: geolocationError,
@@ -61,21 +64,35 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleDesktopSelect = useCallback((camera: Camera) => setLiveCamera(camera), []);
-  const handleMobileSelect = useCallback((camera: Camera) => setMobileSelected(camera), []);
+  const handleDesktopSelect = useCallback((camera: Camera) => {
+    addRecent(camera.id);
+    setLiveCamera(camera);
+  }, [addRecent]);
+
+  const handleMobileSelect = useCallback((camera: Camera) => {
+    addRecent(camera.id);
+    setMobileSelected(camera);
+  }, [addRecent]);
+
   const handleOpenLive = useCallback((camera: Camera) => {
+    addRecent(camera.id);
     setMobileSelected(null);
     setLiveCamera(camera);
-  }, []);
+  }, [addRecent]);
+
   const handleToggleFavorite = useCallback(
     (camera: Camera) => toggleFavorite(camera.id),
     [toggleFavorite]
   );
 
   const favoriteIdSet = new Set(favoriteIds);
+  const recentIdSet = new Set(recentIds);
+  const recentRank = new Map(recentIds.map((id, index) => [id, index]));
+
   const filtered = cameras
     .filter((camera) => {
       if (favoritesOnly && !favoriteIdSet.has(camera.id)) return false;
+      if (recentOnly && !recentIdSet.has(camera.id)) return false;
       if (typeFilter !== 'all' && camera.type !== typeFilter) return false;
       if (!query) return true;
       const q = query.toLowerCase();
@@ -93,13 +110,17 @@ export default function HomePage() {
       };
     });
 
-  const sorted =
-    sortByNearest && userLocation
-      ? [...filtered].sort((a, b) => a.distance - b.distance)
+  const sorted = sortByNearest && userLocation
+    ? [...filtered].sort((a, b) => a.distance - b.distance)
+    : recentOnly
+      ? [...filtered].sort(
+          (a, b) => (recentRank.get(a.camera.id) ?? Number.MAX_SAFE_INTEGER) - (recentRank.get(b.camera.id) ?? Number.MAX_SAFE_INTEGER)
+        )
       : filtered;
 
   const filteredCameras = sorted.map((item) => item.camera);
   const favoriteCount = cameras.filter((camera) => favoriteIdSet.has(camera.id)).length;
+  const recentCount = cameras.filter((camera) => recentIdSet.has(camera.id)).length;
 
   const counts = {
     all: cameras.length,
@@ -136,7 +157,11 @@ export default function HomePage() {
   const favoriteChip = (floating = false) => (
     <button
       type="button"
-      onClick={() => setFavoritesOnly((value) => !value)}
+      onClick={() => {
+        const next = !favoritesOnly;
+        setFavoritesOnly(next);
+        if (next) setRecentOnly(false);
+      }}
       className={`shrink-0 rounded-full text-xs font-bold tracking-wide transition-all duration-200 ${floating ? 'px-3 py-2 backdrop-blur-xl' : 'px-3 py-1.5'}`}
       style={{
         background: favoritesOnly ? 'rgba(245,158,11,0.95)' : floating ? 'rgba(10,14,26,0.82)' : 'rgba(255,255,255,0.04)',
@@ -146,6 +171,26 @@ export default function HomePage() {
       }}
     >
       ★ 收藏 {favoriteCount}
+    </button>
+  );
+
+  const recentChip = (floating = false) => (
+    <button
+      type="button"
+      onClick={() => {
+        const next = !recentOnly;
+        setRecentOnly(next);
+        if (next) setFavoritesOnly(false);
+      }}
+      className={`shrink-0 rounded-full text-xs font-bold tracking-wide transition-all duration-200 ${floating ? 'px-3 py-2 backdrop-blur-xl' : 'px-3 py-1.5'}`}
+      style={{
+        background: recentOnly ? 'rgba(99,102,241,0.95)' : floating ? 'rgba(10,14,26,0.82)' : 'rgba(255,255,255,0.04)',
+        color: recentOnly ? '#fff' : 'var(--text-secondary)',
+        border: `1px solid ${recentOnly ? 'rgba(99,102,241,0.95)' : 'var(--border-subtle)'}`,
+        boxShadow: recentOnly ? '0 0 16px rgba(99,102,241,0.28)' : floating ? '0 6px 20px rgba(0,0,0,0.28)' : 'none',
+      }}
+    >
+      ◷ 最近 {recentCount}
     </button>
   );
 
@@ -206,6 +251,7 @@ export default function HomePage() {
                 <div className="flex flex-wrap gap-2 mt-3">
                   {typeChips()}
                   {favoriteChip()}
+                  {recentChip()}
                 </div>
 
                 <div className="flex items-center gap-2 mt-3">
@@ -281,6 +327,7 @@ export default function HomePage() {
             <div className="absolute left-3 right-3 top-[4.5rem] z-40 flex gap-2 overflow-x-auto pb-1">
               {typeChips(true)}
               {favoriteChip(true)}
+              {recentChip(true)}
             </div>
 
             <div className="absolute right-3 top-[8.25rem] z-40 flex flex-col items-end gap-2">
@@ -308,7 +355,7 @@ export default function HomePage() {
                   opacity: userLocation ? 1 : 0.45,
                 }}
               >
-                最近
+                最近距離
               </button>
             </div>
 
