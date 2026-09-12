@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { Camera } from '@/types/camera';
 import { getDistance } from '@/lib/geo';
-import { getCameraRoadNumber, groupCamerasByRoad } from '@/lib/roads';
+import { getCameraRoadNumber, getRoadNeighbors, groupCamerasByRoad } from '@/lib/roads';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useRecentCameras } from '@/hooks/useRecentCameras';
@@ -13,6 +13,7 @@ import CameraModal from '@/components/CameraModal';
 import CameraBottomSheet from '@/components/CameraBottomSheet';
 import CameraShareButton from '@/components/CameraShareButton';
 import RoadFilter from '@/components/RoadFilter';
+import RoadCameraNavigator from '@/components/RoadCameraNavigator';
 import Map from '@/components/Map';
 
 type View = 'map' | 'list';
@@ -65,6 +66,14 @@ export default function HomePage() {
   } = useGeolocation({ autoLocate: true });
 
   const roadGroups = useMemo(() => groupCamerasByRoad(cameras), [cameras]);
+  const mobileRoadNeighbors = useMemo(
+    () => (mobileSelected ? getRoadNeighbors(cameras, mobileSelected) : null),
+    [cameras, mobileSelected]
+  );
+  const liveRoadNeighbors = useMemo(
+    () => (liveCamera ? getRoadNeighbors(cameras, liveCamera) : null),
+    [cameras, liveCamera]
+  );
 
   const updateUrl = useCallback((updates: Record<string, string | null>) => {
     if (typeof window === 'undefined') return;
@@ -504,12 +513,24 @@ export default function HomePage() {
         onOpenLive={handleOpenLive}
         favorite={mobileSelected ? isFavorite(mobileSelected.id) : false}
         onToggleFavorite={handleToggleFavorite}
+        roadNeighbors={mobileRoadNeighbors}
+        onNavigateRoad={handleMobileSelect}
       />
       <CameraModal camera={liveCamera} onClose={handleCloseLive} />
       {liveCamera && (
-        <div className="hidden md:block fixed top-5 right-5 z-[100000]">
-          <CameraShareButton camera={liveCamera} />
-        </div>
+        <>
+          <div className="hidden md:block fixed top-5 right-5 z-[100000]">
+            <CameraShareButton camera={liveCamera} />
+          </div>
+          {liveRoadNeighbors && liveRoadNeighbors.total > 1 && (
+            <div className="hidden md:block fixed bottom-5 left-[calc(50%+170px)] xl:left-[calc(50%+190px)] -translate-x-1/2 z-[100000]">
+              <RoadCameraNavigator
+                neighbors={liveRoadNeighbors}
+                onNavigate={handleDesktopSelect}
+              />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
