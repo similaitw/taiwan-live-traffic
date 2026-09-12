@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Camera } from '@/types/camera';
 import type { CmsDevice } from '@/types/cms';
+import type { RainfallStation } from '@/types/rainfall';
 import type { TrafficEvent } from '@/types/traffic-event';
 import type { TrafficFlowMapSegment } from '@/types/traffic-flow';
 import { getDistance } from '@/lib/geo';
@@ -26,7 +27,7 @@ interface RenderedFlow { polyline: L.Polyline; signature: string; }
 interface NearestCamera { camera: Camera; distance: number; }
 
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 function formatTime(value?: string): string | undefined {
@@ -73,6 +74,21 @@ function cmsStatusLabel(status?: number): string {
   return '狀態未知';
 }
 
+function rainfallColor(amount?: number): string {
+  if (amount === undefined || amount <= 0) return '#64748b';
+  if (amount < 5) return '#38bdf8';
+  if (amount < 20) return '#06b6d4';
+  if (amount < 40) return '#f59e0b';
+  return '#ef4444';
+}
+
+function rainfallLabel(amount?: number): string {
+  if (amount === undefined) return '?';
+  if (amount < 1) return amount.toFixed(1);
+  if (amount < 10) return amount.toFixed(1).replace(/\.0$/, '');
+  return String(Math.round(amount));
+}
+
 function makeIcon(type: Camera['type']): L.DivIcon {
   const color = COLORS[type];
   return L.divIcon({
@@ -108,6 +124,16 @@ function makeCmsIcon(status?: number): L.DivIcon {
     className: '',
     html: `<div style="width:34px;height:25px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:${color};border:2px solid rgba(255,255,255,.82);box-shadow:0 0 0 5px ${color}22,0 7px 20px rgba(0,0,0,.42);color:white;font-weight:900;font-size:14px">≡</div>`,
     iconSize: [34, 25], iconAnchor: [17, 12], popupAnchor: [0, -16],
+  });
+}
+
+function makeRainfallIcon(station: RainfallStation): L.DivIcon {
+  const amount = station.rainfall.past1Hr;
+  const color = rainfallColor(amount);
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:34px;height:34px;border-radius:9999px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:${color};border:2px solid rgba(255,255,255,.85);box-shadow:0 0 0 5px ${color}22,0 8px 22px rgba(0,0,0,.38);color:white;font-family:'JetBrains Mono',monospace;font-weight:900;line-height:1"><span style="font-size:10px">${rainfallLabel(amount)}</span><span style="font-size:7px;margin-top:2px">1h</span></div>`,
+    iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -20],
   });
 }
 
@@ -164,6 +190,11 @@ function cmsSignature(device: CmsDevice, nearest: NearestCamera | null): string 
   return [device.id, device.status, device.messageStatus, device.messages.join('||'), device.dataCollectTime, nearest?.camera.id, nearest ? Math.round(nearest.distance) : undefined].join('|');
 }
 
+function rainfallSignature(station: RainfallStation): string {
+  const rain = station.rainfall;
+  return [station.id, station.observedAt, rain.now, rain.past10Min, rain.past1Hr, rain.past3Hr, rain.past6Hr, rain.past12Hr, rain.past24Hr].join('|');
+}
+
 function flowAnchor(segment: TrafficFlowMapSegment): [number, number] | null {
   const path = segment.paths.reduce((longest, current) => current.length > longest.length ? current : longest, segment.paths[0] ?? []);
   if (!path.length) return null;
@@ -183,21 +214,27 @@ interface Props {
   trafficFlowSegments?: TrafficFlowMapSegment[];
   cmsDevices?: CmsDevice[];
   cmsPreferredCameraIds?: Record<string, string>;
+  rainfallStations?: RainfallStation[];
+  radarImageUrl?: string;
 }
 
-export default function MapInner({ cameras, query, onSelect, userLocation, trafficEvents = [], trafficFlowSegments = [], cmsDevices = [], cmsPreferredCameraIds = {} }: Props) {
+export default function MapInner({ cameras, query, onSelect, userLocation, trafficEvents = [], trafficFlowSegments = [], cmsDevices = [], cmsPreferredCameraIds = {}, rainfallStations = [], radarImageUrl }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const cameraLayerRef = useRef<L.LayerGroup | null>(null);
+  const rainfallLayerRef = useRef<L.LayerGroup | null>(null);
   const cmsLayerRef = useRef<L.LayerGroup | null>(null);
   const eventLayerRef = useRef<L.LayerGroup | null>(null);
   const flowLayerRef = useRef<L.LayerGroup | null>(null);
+  const radarOverlayRef = useRef<L.ImageOverlay | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const renderedMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
+  const renderedRainfallRef = useRef<Map<string, RenderedMarker>>(new Map());
   const renderedCmsRef = useRef<Map<string, RenderedMarker>>(new Map());
   const renderedEventMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
   const renderedFlowRef = useRef<Map<string, RenderedFlow>>(new Map());
   const cameraFrameRef = useRef<number | null>(null);
+  const rainfallFrameRef = useRef<number | null>(null);
   const cmsFrameRef = useRef<number | null>(null);
   const eventFrameRef = useRef<number | null>(null);
   const flowFrameRef = useRef<number | null>(null);
@@ -207,19 +244,41 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
     const map = L.map(containerRef.current).setView([23.9, 121.0], 8);
     mapRef.current = map;
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+    const radarPane = map.createPane('radarPane');
+    radarPane.style.zIndex = '250';
+    radarPane.style.pointerEvents = 'none';
     flowLayerRef.current = L.layerGroup().addTo(map);
     cameraLayerRef.current = L.layerGroup().addTo(map);
+    rainfallLayerRef.current = L.layerGroup().addTo(map);
     cmsLayerRef.current = L.layerGroup().addTo(map);
     eventLayerRef.current = L.layerGroup().addTo(map);
     return () => {
       if (cameraFrameRef.current !== null) cancelAnimationFrame(cameraFrameRef.current);
+      if (rainfallFrameRef.current !== null) cancelAnimationFrame(rainfallFrameRef.current);
       if (cmsFrameRef.current !== null) cancelAnimationFrame(cmsFrameRef.current);
       if (eventFrameRef.current !== null) cancelAnimationFrame(eventFrameRef.current);
       if (flowFrameRef.current !== null) cancelAnimationFrame(flowFrameRef.current);
-      renderedMarkersRef.current.clear(); renderedCmsRef.current.clear(); renderedEventMarkersRef.current.clear(); renderedFlowRef.current.clear();
+      renderedMarkersRef.current.clear(); renderedRainfallRef.current.clear(); renderedCmsRef.current.clear(); renderedEventMarkersRef.current.clear(); renderedFlowRef.current.clear();
+      radarOverlayRef.current = null;
       map.remove(); mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (radarOverlayRef.current) {
+      map.removeLayer(radarOverlayRef.current);
+      radarOverlayRef.current = null;
+    }
+    if (!radarImageUrl) return;
+    const overlay = L.imageOverlay(radarImageUrl, [[20.5, 118], [26.5, 124]], { opacity: 0.5, interactive: false, pane: 'radarPane' }).addTo(map);
+    radarOverlayRef.current = overlay;
+    return () => {
+      if (map.hasLayer(overlay)) map.removeLayer(overlay);
+      if (radarOverlayRef.current === overlay) radarOverlayRef.current = null;
+    };
+  }, [radarImageUrl]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -258,6 +317,31 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
     schedule(); map.on('moveend', schedule); map.on('zoomend', schedule);
     return () => { map.off('moveend', schedule); map.off('zoomend', schedule); if (cameraFrameRef.current !== null) cancelAnimationFrame(cameraFrameRef.current); };
   }, [cameras, query, onSelect]);
+
+  useEffect(() => {
+    const map = mapRef.current; const layer = rainfallLayerRef.current;
+    if (!map || !layer) return;
+    const createPopup = (station: RainfallStation): HTMLElement => {
+      const root = document.createElement('div'); root.style.width = '220px'; root.style.fontFamily = "'Noto Sans TC',sans-serif";
+      const badge = document.createElement('span'); badge.textContent = 'CWA 雨量站'; badge.style.fontSize = '10px'; badge.style.fontWeight = '800'; badge.style.color = '#7dd3fc'; badge.style.border = '1px solid rgba(56,189,248,.42)'; badge.style.background = 'rgba(14,165,233,.12)'; badge.style.padding = '2px 7px'; badge.style.borderRadius = '9999px'; root.appendChild(badge);
+      const title = document.createElement('div'); title.textContent = station.name; title.style.marginTop = '8px'; title.style.fontSize = '13px'; title.style.fontWeight = '800'; title.style.color = '#e8ecf4'; root.appendChild(title);
+      const location = document.createElement('div'); location.textContent = [station.county, station.town].filter(Boolean).join(' · ') || station.id; location.style.fontSize = '10px'; location.style.color = '#94a3b8'; location.style.marginTop = '3px'; root.appendChild(location);
+      const grid = document.createElement('div'); grid.style.display = 'grid'; grid.style.gridTemplateColumns = '1fr 1fr'; grid.style.gap = '6px'; grid.style.marginTop = '9px';
+      const values: Array<[string, number | undefined]> = [['10 分鐘', station.rainfall.past10Min], ['1 小時', station.rainfall.past1Hr], ['3 小時', station.rainfall.past3Hr], ['24 小時', station.rainfall.past24Hr]];
+      for (const [label, amount] of values) { const cell = document.createElement('div'); cell.style.padding = '7px'; cell.style.borderRadius = '8px'; cell.style.background = 'rgba(255,255,255,.04)'; const labelEl = document.createElement('div'); labelEl.textContent = label; labelEl.style.fontSize = '9px'; labelEl.style.color = '#64748b'; const valueEl = document.createElement('div'); valueEl.textContent = amount === undefined ? '—' : `${amount.toFixed(1)} mm`; valueEl.style.fontSize = '12px'; valueEl.style.fontWeight = '800'; valueEl.style.color = amount && amount > 0 ? '#7dd3fc' : '#cbd5e1'; cell.appendChild(labelEl); cell.appendChild(valueEl); grid.appendChild(cell); }
+      root.appendChild(grid);
+      const time = formatTime(station.observedAt); if (time) { const meta = document.createElement('div'); meta.textContent = `觀測 ${time}`; meta.style.fontSize = '10px'; meta.style.color = '#6b7280'; meta.style.marginTop = '7px'; root.appendChild(meta); }
+      return root;
+    };
+    const render = () => {
+      const bounds = map.getBounds().pad(0.35); const visible = rainfallStations.filter((station) => Number.isFinite(station.lat) && Number.isFinite(station.lng) && bounds.contains([station.lat, station.lng])); const next = new Set<string>();
+      for (const station of visible) { const key = `rain:${station.id}`; const signature = rainfallSignature(station); next.add(key); const existing = renderedRainfallRef.current.get(key); if (existing?.signature === signature) continue; if (existing) layer.removeLayer(existing.marker); const marker = L.marker([station.lat, station.lng], { icon: makeRainfallIcon(station), zIndexOffset: 1200, keyboard: true, title: `${station.name} 近1小時雨量` }); marker.bindPopup(createPopup(station), { maxWidth: 250, className: 'leaflet-camera-preview' }); marker.addTo(layer); renderedRainfallRef.current.set(key, { marker, signature }); }
+      for (const [key, rendered] of renderedRainfallRef.current) if (!next.has(key)) { layer.removeLayer(rendered.marker); renderedRainfallRef.current.delete(key); }
+    };
+    const schedule = () => { if (rainfallFrameRef.current !== null) cancelAnimationFrame(rainfallFrameRef.current); rainfallFrameRef.current = requestAnimationFrame(() => { rainfallFrameRef.current = null; render(); }); };
+    schedule(); map.on('moveend', schedule); map.on('zoomend', schedule);
+    return () => { map.off('moveend', schedule); map.off('zoomend', schedule); if (rainfallFrameRef.current !== null) cancelAnimationFrame(rainfallFrameRef.current); };
+  }, [rainfallStations]);
 
   useEffect(() => {
     const map = mapRef.current; const layer = cmsLayerRef.current;
