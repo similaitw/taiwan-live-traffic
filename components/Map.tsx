@@ -14,8 +14,13 @@ interface Props {
 
 export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   return (
-    <div className="w-full h-full rounded-xl overflow-hidden"
-      style={{ border: '1px solid var(--border-subtle)', boxShadow: '0 4px 24px rgba(0,0,0,0.3)' }}>
+    <div
+      className="w-full h-full overflow-hidden rounded-none md:rounded-xl"
+      style={{
+        border: '1px solid var(--border-subtle)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+      }}
+    >
       <MapInner
         cameras={cameras}
         query={query}
