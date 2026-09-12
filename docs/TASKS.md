@@ -2,71 +2,70 @@
 
 > Repository：`similaitw/taiwan-live-traffic`
 >
-> 執行方式：每次只完成一個 `Current task`。完成、測試、commit、push 後，才把 Current task 移到下一項。
+> 執行方式：每次只完成一個 `Current task`。預設由 ChatGPT 直接透過 GitHub 實作與驗收；只有明確標示 `Executor: Codex` 才使用 Codex。
 
 ## Current task
 
-### M1.3 — hooks 基礎拆分
+### M2.1 — Mobile map-first layout
+
+**Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 拆分 `useGeolocation`。
-- [ ] 建立 `useFavorites`。
-- [ ] 建立 `useRecentCameras`。
-- [ ] localStorage 必須 SSR safe。
-- [ ] `npm run build` 通過；若已有相關測試，也要執行。
+- [ ] 手機版改為 map-first，地圖成為主要畫面。
+- [ ] 搜尋列改為地圖上方 floating search bar。
+- [ ] 類型 filter chips 可水平滑動且不擠壓地圖高度。
+- [ ] 定位改為地圖 floating button。
+- [ ] 手機版弱化／移除佔高度的傳統 Header 與 filter bar。
+- [ ] 保留既有搜尋、類型篩選、定位、最近排序、Map/List 功能相容性；若手機 UI 隱藏 List toggle，桌面既有功能仍需保留。
+- [ ] 375px 寬度不得有主要操作被遮住或水平溢位。
+- [ ] 768px、1280px 既有介面不可明顯退化；M2.2 才正式做 desktop sidebar。
+- [ ] 不在此任務加入 Bottom Sheet；留給 M2.3。
+- [ ] GitHub Actions CI build 通過。
 
-詳細需求需要時讀 `docs/V2_SPEC.md` 對應章節。完成後將 Current task 更新成 M2.1 — Mobile map-first layout，commit 並 push 到 main。
+完成後將 Current task 更新成 M2.2 — Desktop sidebar layout。
 
 ---
 
 ## 已完成任務
 
-### M1.2 — 共用 geo utilities（已完成）
+### M1.3 — hooks 基礎拆分（已完成）
 
-目標／範圍：
+**Executor: ChatGPT**
+
+- [x] 拆分 `useGeolocation`，首頁改用共用 hook。
+- [x] 保留原本自動定位「失敗靜默」、手動定位「失敗顯示錯誤」的行為。
+- [x] 建立 `useFavorites`，使用 `taiwan-live-traffic:favorites`。
+- [x] 建立 `useRecentCameras`，使用 `taiwan-live-traffic:recent`，最多 20 支。
+- [x] localStorage 僅在 client effect／`window` 可用時讀寫，SSR safe。
+- [x] 新增 GitHub Actions CI，往後 push 自動執行 `npm ci` + `npm run build`。
+- [x] GitHub Actions run `34703000850` 的 Build step 通過。
+
+---
+
+### M1.2 — 共用 geo utilities（已完成）
 
 - [x] 新增 `lib/geo.ts`。
 - [x] 把 Haversine distance 從 `app/page.tsx` 與 `components/MapInner.tsx` 移出。
 - [x] 最近排序結果保持一致。
-- [x] `npm run build` 通過；若已有相關測試，也要執行。
+- [x] `npm run build` 通過。
 
-驗證：`npm run build` 通過；81 組座標距離與兩份原始函式完全一致，兩份函式各 9 組最近排序（含同距離）比較通過，公尺單位檢查通過。現有專案無相關測試套件。
+驗證：81 組座標距離與兩份原始函式完全一致，兩份函式各 9 組最近排序（含同距離）比較通過，公尺單位檢查通過。
 
 ---
 
 ### M1.1 — Camera V2 data model（已完成）
 
-驗證：`npm run build` 通過；8 組 normalizer 案例（含相容性、重複正規化與不修改輸入）通過。現有專案無相關測試套件。
-
-目標：擴充 Camera 資料模型與正規化層，但不改 UI、不改 `/api/cameras` response shape。
-
-直接相關檔案：
-
-- `types/camera.ts`
-- `lib/freeway.ts`
-- `lib/thb.ts`
-- 新增 `lib/camera-normalizer.ts`
-
-必要工作：
-
 - [x] 擴充 `Camera` interface：`provider`、`roadNumber`、`mile`、`county`、`district`、`streamType`、`status`、`lastCheckedAt`、`lastFrameAt`、`tags`。
 - [x] 新增 `CameraType`、`CameraStatus` type。
 - [x] 新增 `lib/camera-normalizer.ts`。
-- [x] normalizer 至少能處理道路名稱／道路編號／公里數／方向／tags 的基礎正規化。
-- [x] `freeway.ts` 使用 normalizer，能取得時補 `provider`、`roadNumber`、`mile`、`tags`。
-- [x] `thb.ts` 使用 normalizer，能取得時補 `provider`、`roadNumber`、`mile`、`tags`。
-- [x] 所有新增欄位先保持 optional，相容既有資料來源。
-- [x] 不修改 UI。
+- [x] normalizer 處理道路名稱／道路編號／公里數／方向／tags 基礎正規化。
+- [x] `freeway.ts`、`thb.ts` 使用 normalizer。
+- [x] 所有新增欄位保持 optional，相容既有資料來源。
 - [x] 不修改 `/api/cameras` response shape。
 - [x] `npm run build` 通過。
 
-完成後請：
-
-1. 將 M1.1 標記完成。
-2. 將 `Current task` 更新成 `M1.2 — 共用 geo utilities`。
-3. commit 並 push 到 `main`。
-4. 回報 commit SHA。
+驗證：8 組 normalizer 案例（含相容性、重複正規化與不修改輸入）通過。
 
 ---
 
@@ -76,11 +75,11 @@
 
 - [x] M1.1 Camera V2 data model
 - [x] M1.2 共用 geo utilities
-- [ ] M1.3 hooks 基礎拆分
+- [x] M1.3 hooks 基礎拆分
 
 ### M2 — UI 2.0
 
-- [ ] M2.1 Mobile map-first layout
+- [ ] M2.1 Mobile map-first layout — **ChatGPT**
 - [ ] M2.2 Desktop sidebar layout
 - [ ] M2.3 Camera Bottom Sheet
 
@@ -103,15 +102,15 @@
 
 ---
 
-## 下一任務摘要
+## Executor 原則
 
-### M1.3 — hooks 基礎拆分
+預設：`ChatGPT`。
 
-預定範圍：
+只有符合以下任一情況，才把 Current task 標示為 `Executor: Codex`：
 
-- `useGeolocation`
-- `useFavorites`
-- `useRecentCameras`
-- localStorage 必須 SSR safe。
+- 大型跨檔重構且需要長上下文探索。
+- 難以定位的 bug，需要反覆執行與除錯。
+- 必須依賴完整本機 runtime／瀏覽器 agent，而 GitHub Actions 或 ChatGPT 現有工具無法可靠驗證。
+- ChatGPT 完成初步實作後，仍有明確未解的工程問題。
 
-其餘詳細需求需要時再讀 `docs/V2_SPEC.md` 對應章節，不要每次完整重讀。
+單純 build 不構成使用 Codex 的理由；一般 build 由 GitHub Actions 處理。
