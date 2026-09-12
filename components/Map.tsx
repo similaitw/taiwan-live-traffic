@@ -10,14 +10,15 @@ import type { TrafficFlowMapSegment, TrafficFlowResponse } from '@/types/traffic
 import type { TrafficSectionsResponse } from '@/types/traffic-section';
 import { getDistance } from '@/lib/geo';
 import { getCameraRoadNumber, normalizeRoadNumber } from '@/lib/roads';
+import MapLayerControls, {
+  type CmsLayerFilter,
+  type EventLayerFilter,
+  type FlowLayerFilter,
+  type RainfallLayerFilter,
+} from '@/components/MapLayerControls';
 
 const MapInner = dynamic(() => import('./MapInner'), { ssr: false });
 const RADAR_IMAGE_URL = 'https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-006.png';
-
-type EventFilter = 'all' | 'important' | 'serious';
-type FlowFilter = 'all' | 'congested';
-type CmsFilter = 'active' | 'all' | 'abnormal';
-type RainfallFilter = 'rainy' | 'all';
 
 interface Props {
   cameras: Camera[];
@@ -30,24 +31,24 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   const [trafficEvents, setTrafficEvents] = useState<TrafficEvent[]>([]);
   const [trafficEnabled, setTrafficEnabled] = useState(false);
   const [showTrafficEvents, setShowTrafficEvents] = useState(true);
-  const [eventFilter, setEventFilter] = useState<EventFilter>('all');
+  const [eventFilter, setEventFilter] = useState<EventLayerFilter>('all');
 
   const [trafficFlow, setTrafficFlow] = useState<TrafficFlowResponse | null>(null);
   const [trafficSections, setTrafficSections] = useState<TrafficSectionsResponse | null>(null);
   const [flowEnabled, setFlowEnabled] = useState(false);
   const [showTrafficFlow, setShowTrafficFlow] = useState(true);
-  const [flowFilter, setFlowFilter] = useState<FlowFilter>('all');
+  const [flowFilter, setFlowFilter] = useState<FlowLayerFilter>('all');
 
   const [cmsDevices, setCmsDevices] = useState<CmsDevice[]>([]);
   const [cmsEnabled, setCmsEnabled] = useState(false);
   const [showCms, setShowCms] = useState(true);
-  const [cmsFilter, setCmsFilter] = useState<CmsFilter>('active');
+  const [cmsFilter, setCmsFilter] = useState<CmsLayerFilter>('active');
   const [cmsRoad, setCmsRoad] = useState('');
 
   const [rainfallStations, setRainfallStations] = useState<RainfallStation[]>([]);
   const [rainfallEnabled, setRainfallEnabled] = useState(false);
   const [showRainfall, setShowRainfall] = useState(true);
-  const [rainfallFilter, setRainfallFilter] = useState<RainfallFilter>('rainy');
+  const [rainfallFilter, setRainfallFilter] = useState<RainfallLayerFilter>('rainy');
   const [showRadar, setShowRadar] = useState(false);
   const [radarVersion, setRadarVersion] = useState(0);
 
@@ -157,13 +158,24 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
       .map((flow): TrafficFlowMapSegment | null => {
         const section = sectionById.get(flow.sectionId);
         if (!section || section.paths.length === 0) return null;
-        return { ...flow, roadId: section.roadId, roadName: section.roadName, roadDirection: section.roadDirection, sectionName: section.sectionName, start: section.start, end: section.end, paths: section.paths };
+        return {
+          ...flow,
+          roadId: section.roadId,
+          roadName: section.roadName,
+          roadDirection: section.roadDirection,
+          sectionName: section.sectionName,
+          start: section.start,
+          end: section.end,
+          paths: section.paths,
+        };
       })
       .filter((segment): segment is TrafficFlowMapSegment => segment !== null);
   }, [trafficFlow, trafficSections]);
 
   const filteredCongestionSegments = useMemo(() => {
-    if (flowFilter === 'congested') return congestionSegments.filter((segment) => (segment.congestionLevel ?? 0) >= 3);
+    if (flowFilter === 'congested') {
+      return congestionSegments.filter((segment) => (segment.congestionLevel ?? 0) >= 3);
+    }
     return congestionSegments;
   }, [congestionSegments, flowFilter]);
 
@@ -212,7 +224,13 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
     : undefined;
 
   return (
-    <div className="relative w-full h-full overflow-hidden rounded-none md:rounded-xl" style={{ border: '1px solid var(--border-subtle)', boxShadow: '0 4px 24px rgba(0,0,0,0.3)' }}>
+    <div
+      className="relative w-full h-full overflow-hidden rounded-none md:rounded-xl"
+      style={{
+        border: '1px solid var(--border-subtle)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+      }}
+    >
       <MapInner
         cameras={cameras}
         query={query}
@@ -226,76 +244,41 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         radarImageUrl={radarImageUrl}
       />
 
-      <div className="absolute right-3 bottom-16 md:bottom-auto md:top-3 z-[900] flex flex-col items-end gap-2">
-        <div className="flex flex-wrap justify-end items-center gap-2 max-w-[min(92vw,520px)]">
-          {rainfallEnabled && showRainfall && rainfallStations.length > 0 && (
-            <select value={rainfallFilter} onChange={(event) => setRainfallFilter(event.target.value as RainfallFilter)} className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl" style={{ background: 'rgba(10,14,26,0.9)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }} aria-label="雨量站篩選">
-              <option value="rainy">近1小時有雨</option>
-              <option value="all">全部雨量站</option>
-            </select>
-          )}
-          {rainfallEnabled && (
-            <button type="button" onClick={() => setShowRainfall((value) => !value)} className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all" style={{ background: showRainfall ? 'rgba(14,165,233,0.92)' : 'rgba(10,14,26,0.86)', color: '#fff', border: `1px solid ${showRainfall ? 'rgba(56,189,248,0.9)' : 'var(--border-subtle)'}`, boxShadow: '0 8px 22px rgba(0,0,0,0.3)' }} aria-pressed={showRainfall}>
-              💧 雨量站 {showRainfall ? filteredRainfallStations.length : rainfallStations.length}
-            </button>
-          )}
-          <button type="button" onClick={() => setShowRadar((value) => !value)} className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all" style={{ background: showRadar ? 'rgba(99,102,241,0.92)' : 'rgba(10,14,26,0.86)', color: '#fff', border: `1px solid ${showRadar ? 'rgba(129,140,248,0.9)' : 'var(--border-subtle)'}`, boxShadow: '0 8px 22px rgba(0,0,0,0.3)' }} aria-pressed={showRadar}>
-            🌦 雷達 {showRadar ? '開' : '關'}
-          </button>
-        </div>
-
-        {cmsEnabled && (
-          <div className="flex flex-wrap justify-end items-center gap-2 max-w-[min(92vw,520px)]">
-            {showCms && cmsDevices.length > 0 && (
-              <>
-                {cmsRoadOptions.length > 1 && (
-                  <select value={cmsRoad} onChange={(event) => setCmsRoad(event.target.value)} className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl max-w-36" style={{ background: 'rgba(10,14,26,0.9)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }} aria-label="官方看板道路">
-                    <option value="">全部道路</option>
-                    {cmsRoadOptions.map((road) => <option key={road} value={road}>{road}</option>)}
-                  </select>
-                )}
-                <select value={cmsFilter} onChange={(event) => setCmsFilter(event.target.value as CmsFilter)} className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl" style={{ background: 'rgba(10,14,26,0.9)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }} aria-label="官方看板篩選">
-                  <option value="active">目前顯示</option>
-                  <option value="all">全部設備</option>
-                  <option value="abnormal">異常設備</option>
-                </select>
-              </>
-            )}
-            <button type="button" onClick={() => setShowCms((value) => !value)} className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all" style={{ background: showCms ? 'rgba(6,182,212,0.92)' : 'rgba(10,14,26,0.86)', color: '#fff', border: `1px solid ${showCms ? 'rgba(34,211,238,0.9)' : 'var(--border-subtle)'}`, boxShadow: '0 8px 22px rgba(0,0,0,0.3)' }} aria-pressed={showCms}>
-              📢 官方看板 {showCms ? filteredCmsDevices.length : cmsDevices.length}
-            </button>
-          </div>
-        )}
-
-        {flowEnabled && (
-          <div className="flex items-center gap-2">
-            {showTrafficFlow && congestionSegments.length > 0 && (
-              <select value={flowFilter} onChange={(event) => setFlowFilter(event.target.value as FlowFilter)} className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl" style={{ background: 'rgba(10,14,26,0.9)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }} aria-label="即時路況篩選">
-                <option value="all">全部路況</option>
-                <option value="congested">只看壅塞</option>
-              </select>
-            )}
-            <button type="button" onClick={() => setShowTrafficFlow((value) => !value)} className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all" style={{ background: showTrafficFlow ? 'rgba(16,185,129,0.9)' : 'rgba(10,14,26,0.86)', color: '#fff', border: `1px solid ${showTrafficFlow ? 'rgba(52,211,153,0.85)' : 'var(--border-subtle)'}`, boxShadow: '0 8px 22px rgba(0,0,0,0.3)' }} aria-pressed={showTrafficFlow}>
-              🚗 即時路況 {showTrafficFlow ? filteredCongestionSegments.length : congestionSegments.length}
-            </button>
-          </div>
-        )}
-
-        {trafficEnabled && (
-          <div className="flex items-center gap-2">
-            {showTrafficEvents && trafficEvents.length > 0 && (
-              <select value={eventFilter} onChange={(event) => setEventFilter(event.target.value as EventFilter)} className="h-9 rounded-full px-3 text-[11px] font-bold outline-none backdrop-blur-xl" style={{ background: 'rgba(10,14,26,0.9)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }} aria-label="交通事件嚴重程度">
-                <option value="all">全部事件</option>
-                <option value="important">警示以上</option>
-                <option value="serious">嚴重事件</option>
-              </select>
-            )}
-            <button type="button" onClick={() => setShowTrafficEvents((value) => !value)} className="h-9 px-3 rounded-full text-xs font-bold backdrop-blur-xl transition-all" style={{ background: showTrafficEvents ? 'rgba(239,68,68,0.92)' : 'rgba(10,14,26,0.86)', color: '#fff', border: `1px solid ${showTrafficEvents ? 'rgba(248,113,113,0.9)' : 'var(--border-subtle)'}`, boxShadow: '0 8px 22px rgba(0,0,0,0.3)' }} aria-pressed={showTrafficEvents}>
-              ⚠ 交通事件 {showTrafficEvents ? filteredTrafficEvents.length : trafficEvents.length}
-            </button>
-          </div>
-        )}
-      </div>
+      <MapLayerControls
+        rainfallEnabled={rainfallEnabled}
+        showRainfall={showRainfall}
+        onToggleRainfall={() => setShowRainfall((value) => !value)}
+        rainfallFilter={rainfallFilter}
+        onRainfallFilterChange={setRainfallFilter}
+        rainfallCount={filteredRainfallStations.length}
+        rainfallTotal={rainfallStations.length}
+        showRadar={showRadar}
+        onToggleRadar={() => setShowRadar((value) => !value)}
+        cmsEnabled={cmsEnabled}
+        showCms={showCms}
+        onToggleCms={() => setShowCms((value) => !value)}
+        cmsFilter={cmsFilter}
+        onCmsFilterChange={setCmsFilter}
+        cmsRoad={cmsRoad}
+        onCmsRoadChange={setCmsRoad}
+        cmsRoadOptions={cmsRoadOptions}
+        cmsCount={filteredCmsDevices.length}
+        cmsTotal={cmsDevices.length}
+        flowEnabled={flowEnabled}
+        showFlow={showTrafficFlow}
+        onToggleFlow={() => setShowTrafficFlow((value) => !value)}
+        flowFilter={flowFilter}
+        onFlowFilterChange={setFlowFilter}
+        flowCount={filteredCongestionSegments.length}
+        flowTotal={congestionSegments.length}
+        eventsEnabled={trafficEnabled}
+        showEvents={showTrafficEvents}
+        onToggleEvents={() => setShowTrafficEvents((value) => !value)}
+        eventFilter={eventFilter}
+        onEventFilterChange={setEventFilter}
+        eventCount={filteredTrafficEvents.length}
+        eventTotal={trafficEvents.length}
+      />
     </div>
   );
 }
