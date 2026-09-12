@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const ALLOWED_HOSTNAMES = [
-  'cctvs.freeway.gov.tw',
-  'tisvcloud.freeway.gov.tw',
-  'thbapp.thb.gov.tw',
-  'cctv.thb.gov.tw',
-  'cciv.thb.gov.tw',
-  'cctv-ss05.thb.gov.tw',
-  'its.taipei.gov.tw',
-];
+import {
+  CameraProxyUrlError,
+  fetchAllowedCameraResource,
+  parseAllowedCameraUrl,
+} from '@/lib/camera-proxy-security';
 
 export async function GET(req: NextRequest) {
   const rawUrl = req.nextUrl.searchParams.get('url');
@@ -17,35 +12,25 @@ export async function GET(req: NextRequest) {
     return new NextResponse('Missing url parameter', { status: 400 });
   }
 
-  let parsed: URL;
   try {
-    parsed = new URL(rawUrl);
+    parseAllowedCameraUrl(rawUrl);
   } catch (error) {
-    console.log('[proxy/image] invalid url:', rawUrl, error);
+    if (error instanceof CameraProxyUrlError) {
+      console.log('[proxy/image] rejected url:', rawUrl, error.message);
+      return new NextResponse(error.message, { status: error.status });
+    }
     return new NextResponse('Invalid URL', { status: 400 });
-  }
-
-  // Whitelist check: allow specific hosts and wildcard patterns for THB CCTV servers
-  const hostname = parsed.hostname;
-  const isAllowed = 
-    ALLOWED_HOSTNAMES.includes(hostname) ||
-    /^cctv-[a-z0-9]+\.thb\.gov\.tw$/.test(hostname);
-
-  if (!isAllowed) {
-    console.log('[proxy/image] hostname not allowed:', hostname);
-    return new NextResponse('URL not allowed', { status: 403 });
   }
 
   try {
     console.log('[proxy/image] fetching:', rawUrl);
-    const upstream = await fetch(rawUrl, {
+    const upstream = await fetchAllowedCameraResource(rawUrl, {
       signal: AbortSignal.timeout(15000),
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://thbapp.thb.gov.tw/',
         'Accept': 'image/*,*/*;q=0.8',
       },
-      redirect: 'follow',
     });
 
     console.log('[proxy/image] upstream status:', upstream.status, 'content-type:', upstream.headers.get('content-type'));
@@ -71,6 +56,10 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof CameraProxyUrlError) {
+      console.error('[proxy/image] blocked redirect:', error.message);
+      return new NextResponse(error.message, { status: error.status });
+    }
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error('[proxy/image] error:', errMsg);
     console.error('[proxy/image] url that errored:', rawUrl);
