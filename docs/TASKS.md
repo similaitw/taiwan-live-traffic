@@ -6,41 +6,31 @@
 
 ## Current task
 
-### M10.3 — Layer preferences persistence
+### M11.1 — Camera proxy redirect / SSRF hardening
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 以 localStorage 記住雷達、雨量、CMS、即時路況、交通事件的顯示開關。
-- [ ] 記住 rainfall / CMS / flow / event filter，但不記動態 CMS road 選項，避免資料來源變動造成空畫面。
-- [ ] 儲存 key 使用版本化命名；資料損壞或舊格式時安全忽略並採預設值。
-- [ ] 首次 hydration 完成前不得用預設值覆蓋既有偏好。
-- [ ] TDX/CMS 暫時 unavailable 時不得清掉已儲存偏好，日後資料源恢復仍沿用。
-- [ ] 不影響 Camera 收藏／最近觀看的既有 localStorage。
+- [ ] 抽出共用 Camera proxy URL allowlist / validation helper，避免 image 與 snapshot proxy 各維護一份規則。
+- [ ] 僅允許 `http:` / `https:`，拒絕 URL credentials 與非 allowlist host。
+- [ ] 上游 redirect 改為手動追蹤，每一跳都重新驗證 hostname；設定合理 redirect 上限。
+- [ ] redirect 相對 URL 必須以目前上游 URL 正確解析後再驗證。
+- [ ] image/MJPEG stream proxy 與 snapshot proxy 都使用同一套安全 fetch。
+- [ ] 保留原本 timeout、snapshot MJPEG 單幀擷取與錯誤處理語意。
+- [ ] 不擴大現有允許來源清單。
 - [ ] GitHub Actions CI build 通過。
 
-完成後 M10 圖層控制階段結案。
+完成後將 Current task 更新成 M11.2 — Source freshness / health visibility。
 
 ---
 
 ## 已完成任務
 
-### M10.2 — Mobile layer-panel polish / responsive validation（已完成）
-- [x] 行動版加入 safe-area bottom offset。
-- [x] 面板使用 dynamic viewport 高度限制與 overscroll containment。
-- [x] Escape 可收合，panel 有 region / aria label。
-- [x] 主要 toggle / select / close button 採 44px 級觸控目標；超窄螢幕 CMS filters 改單欄。
-- [x] 375 / 768 / 1280 響應式規則完成程式碼檢查。
-- [x] 瀏覽器視覺驗證未宣稱完成：執行環境有 Chromium，但容器無法解析 GitHub DNS；Vercel connector 也未回傳可用 team/project。
-- [x] GitHub Actions run `34709117895` 成功。
-
-### M10.1 — Unified map layer controls（已完成）
-- [x] 新增 `MapLayerControls`，多排浮動控制收成單一圖層入口。
-- [x] 天氣、路況、事件、CMS 開關與既有 filters 保留。
-- [x] `Map` 保留資料／狀態管理；Leaflet 邏輯未搬入控制元件。
-- [x] 不可用的 TDX/CMS 圖層自動隱藏，CWA/CCTV 不受影響。
-- [x] GitHub Actions run `34709009247` 成功。
+### M10 — 圖層控制與行動版整理（已完成）
+- [x] M10.1 Unified map layer controls — CI `34709009247`
+- [x] M10.2 Mobile layer-panel polish / responsive validation — CI `34709117895`
+- [x] M10.3 Layer preferences persistence — CI `34709191760`
 
 ### M9 — 天氣／降雨（已完成）
 - [x] M9.1 CWA rainfall observation foundation — CI `34708540549`
@@ -114,9 +104,14 @@
 - [x] M9.3
 
 ### M10 — 圖層控制與行動版整理
-- [x] M10.1 Unified map layer controls
-- [x] M10.2 Mobile layer-panel polish / responsive validation
-- [ ] M10.3 Layer preferences persistence — **ChatGPT**
+- [x] M10.1
+- [x] M10.2
+- [x] M10.3
+
+### M11 — Production hardening
+- [ ] M11.1 Camera proxy redirect / SSRF hardening — **ChatGPT**
+- [ ] M11.2 Source freshness / health visibility
+- [ ] M11.3 Live stream bandwidth / lifecycle guardrails
 
 ---
 
