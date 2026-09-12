@@ -29,7 +29,7 @@ export default function CameraSearchBar({
   const [local, setLocal] = useState(value);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurTimerRef = useRef<number | null>(null);
 
   const suggestions = useMemo(
     () => buildCameraSearchSuggestions(cameras, local),
