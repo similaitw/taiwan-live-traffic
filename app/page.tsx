@@ -87,7 +87,9 @@ export default function HomePage() {
 
   const favoriteIdSet = new Set(favoriteIds);
   const recentIdSet = new Set(recentIds);
-  const recentRank = new Map(recentIds.map((id, index) => [id, index]));
+  const recentRank = new globalThis.Map<string, number>(
+    recentIds.map((id, index) => [id, index] as const)
+  );
 
   const filtered = cameras
     .filter((camera) => {
