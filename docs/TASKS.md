@@ -6,25 +6,35 @@
 
 ## Current task
 
-### M3.1 — Marker clustering
+### M3.2 — Viewport optimization
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 移除目前依地圖中心距離只顯示 50 / 100 / 200 支 Camera 的截斷策略。
-- [ ] 低縮放層級將鄰近 Camera 聚合成 cluster marker，顯示數量。
-- [ ] 點 cluster 後自動放大到該區域，逐步展開 Camera。
-- [ ] 放大後顯示單支 Camera marker，維持既有點擊／快照預覽行為。
-- [ ] 不新增重型 clustering dependency；優先使用 Leaflet 現有投影能力實作輕量 clustering。
-- [ ] 本任務先不做 viewport optimization；留給 M3.2。
+- [ ] 地圖 marker / cluster 只處理目前 viewport 與周邊 buffer 內的 Camera。
+- [ ] 使用差異更新：保留仍在畫面中的 marker，只新增／移除真正變動的 marker，避免每次移動完整 clear + recreate。
+- [ ] 拖曳與縮放後更新 marker，不影響 cluster 點擊與 Camera 點擊行為。
+- [ ] 不改 `/api/cameras` response shape。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M3.2 — Viewport optimization。
+完成後將 Current task 更新成 M4.1 — 收藏。
 
 ---
 
 ## 已完成任務
+
+### M3.1 — Marker clustering（已完成）
+
+**Executor: ChatGPT**
+
+- [x] 移除原本 50 / 100 / 200 支 Camera 的中心距離截斷策略。
+- [x] 使用 Leaflet 投影座標建立輕量 grid clustering，不新增 npm dependency。
+- [x] cluster marker 顯示 Camera 數量，點擊後逐步放大。
+- [x] 高縮放層級顯示單支 Camera marker，維持既有 hover preview 與 click 行為。
+- [x] GitHub Actions run `34703638881`：Install dependencies 與 Build 均成功。
+
+---
 
 ### M2.3 — Camera Bottom Sheet（已完成）
 
@@ -123,8 +133,8 @@
 
 ### M3 — 地圖效能
 
-- [ ] M3.1 Marker clustering — **ChatGPT**
-- [ ] M3.2 Viewport optimization
+- [x] M3.1 Marker clustering — **ChatGPT**
+- [ ] M3.2 Viewport optimization — **ChatGPT**
 
 ### M4 — 使用者功能
 
