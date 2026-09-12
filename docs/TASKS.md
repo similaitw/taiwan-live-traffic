@@ -6,51 +6,49 @@
 
 ## Current task
 
-### M6.2 — Traffic event map overlay
+### M6.3 — Event filters / Camera verification workflow
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 首頁在 client 端讀取 `/api/traffic-events`，不得影響 Camera API 載入。
-- [ ] 新增「交通事件」顯示切換；TDX 未啟用時維持 Camera-only，不顯示錯誤 overlay。
-- [ ] Map / MapInner 接受 `TrafficEvent[]`，以獨立 layer render，不混進 Camera clustering。
-- [ ] 有座標的事件在地圖顯示 marker；依 `info / warning / serious` 做視覺區分。
-- [ ] 點事件 marker 顯示事件標題、道路、影響描述、發布時間等摘要，不啟動 Camera live modal。
-- [ ] 事件 overlay 與 Camera viewport optimization 可共存，拖曳／縮放不應造成 Camera marker 退化。
+- [ ] 交通事件 overlay 提供「全部／警示以上／嚴重」篩選，不影響 Camera 篩選。
+- [ ] 事件 marker popup 找出距離最近的 Camera；合理距離內提供「查看最近監視器」操作。
+- [ ] 點「查看最近監視器」沿用既有 Camera `onSelect`，手機開 Bottom Sheet、桌面開詳細直播流程。
+- [ ] popup 顯示最近 Camera 名稱與距離，讓使用者知道 CCTV 與事件位置並非同一點。
+- [ ] 沒有鄰近 Camera 時不顯示驗證按鈕，不製造錯誤期待。
+- [ ] 不把交通事件混進收藏／最近觀看 Camera 資料。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M6.3 — Event filters / Camera verification workflow。
+完成後 M6 結案，後續進入 M7 路況判斷深化。
 
 ---
 
 ## 已完成任務
 
+### M6.2 — Traffic event map overlay（已完成）
+
+- [x] `Map` 獨立讀取 `/api/traffic-events`，Camera API 載入不受影響。
+- [x] TDX 啟用時才顯示交通事件切換；未啟用時維持 Camera-only。
+- [x] 交通事件使用獨立 Leaflet layer，不混入 Camera clustering。
+- [x] 事件依 `info / warning / serious` 顯示不同警示色。
+- [x] 事件 popup 顯示標題、道路、影響描述與發布時間。
+- [x] 事件 layer 採 viewport + 差異更新，與 Camera optimization 共存。
+- [x] GitHub Actions run `34704812771` 成功。
+
 ### M6.1 — TDX road-event foundation（已完成）
 
-**Executor: ChatGPT**
+- [x] `TrafficEvent` / source response model。
+- [x] server-side TDX OAuth token 快取。
+- [x] 國道道路事件 adapter 與 `/api/traffic-events`。
+- [x] 未設定金鑰／上游失敗皆 graceful degradation。
+- [x] `.env.example`。
+- [x] GitHub Actions run `34704685825` 成功。
 
-- [x] 新增 `TrafficEvent` / source response model。
-- [x] 新增 server-side TDX OAuth helper，使用 `TDX_CLIENT_ID` / `TDX_CLIENT_SECRET` 並快取 access token。
-- [x] 新增國道即時道路事件 adapter，支援裸 array 與 `{ RoadEvents: [...] }` envelope。
-- [x] normalizer 處理 `EventID`、`EventTitle`、`Positions` WKT、道路、Impact、發布／生效時間。
-- [x] 新增 `/api/traffic-events`，未設定 TDX 金鑰時安全回傳 `enabled:false`。
-- [x] TDX 上游失敗時 graceful degradation，不影響 Camera 功能。
-- [x] 新增 `.env.example`。
-- [x] GitHub Actions run `34704685825`：Install dependencies 與 Build 均成功。
-
-### M5.3 — Nearby mode（已完成）
-- [x] 5 / 10 / 20 km 附近模式、定位觸發、半徑過濾與距離排序。
-- [x] URL 支援 `nearby=5|10|20`。
-- [x] CI `34704517553` 成功。
-
-### M5.2 — Road navigator（已完成）
-- [x] 同道路／同方向上一支與下一支。
-- [x] CI `34704427438` 成功。
-
-### M5.1 — Road grouping（已完成）
-- [x] 道路自動辨識、群組、篩選與 `road=` URL。
-- [x] CI `34704232348` 成功。
+### M5 — 道路模式（已完成）
+- [x] M5.1 Road grouping — CI `34704232348`
+- [x] M5.2 Road navigator — CI `34704427438`
+- [x] M5.3 Nearby mode — CI `34704517553`
 
 ### M4 — 使用者功能（已完成）
 - [x] M4.1 收藏 — CI `34703855243`
@@ -84,8 +82,8 @@
 
 ### M6 — 即時交通事件
 - [x] M6.1 TDX road-event foundation
-- [ ] M6.2 Traffic event map overlay — **ChatGPT**
-- [ ] M6.3 Event filters / Camera verification workflow
+- [x] M6.2 Traffic event map overlay
+- [ ] M6.3 Event filters / Camera verification workflow — **ChatGPT**
 
 ### M7 — 路況判斷深化（暫定）
 - [ ] 壅塞／旅行速度或路況資訊 overlay
