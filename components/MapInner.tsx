@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Camera } from '@/types/camera';
-import { getDistance } from '@/lib/geo';
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -18,6 +17,12 @@ const COLORS: Record<Camera['type'], string> = {
   provincial: '#10b981',
   county: '#f59e0b',
 };
+
+interface CameraCluster {
+  cameras: Camera[];
+  lat: number;
+  lng: number;
+}
 
 function makeIcon(type: Camera['type']): L.DivIcon {
   const color = COLORS[type];
@@ -43,6 +48,64 @@ function makeIcon(type: Camera['type']): L.DivIcon {
   });
 }
 
+function makeClusterIcon(count: number): L.DivIcon {
+  const size = count >= 100 ? 52 : count >= 25 ? 46 : 40;
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:${size}px;
+      height:${size}px;
+      border-radius:9999px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-family:'JetBrains Mono',monospace;
+      font-weight:800;
+      font-size:${count >= 100 ? 11 : 12}px;
+      background:linear-gradient(135deg,rgba(59,130,246,0.96),rgba(99,102,241,0.96));
+      border:2px solid rgba(255,255,255,0.65);
+      box-shadow:0 0 0 6px rgba(59,130,246,0.14),0 8px 24px rgba(0,0,0,0.42);
+    ">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
+function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraCluster[] {
+  // At close zoom levels individual cameras are more useful than clustering.
+  if (zoom >= 15) {
+    return cameras.map((camera) => ({ cameras: [camera], lat: camera.lat, lng: camera.lng }));
+  }
+
+  const cellSize = zoom <= 7 ? 110 : zoom <= 9 ? 90 : zoom <= 11 ? 72 : zoom <= 13 ? 56 : 42;
+  const groups = new Map<string, { cameras: Camera[]; latSum: number; lngSum: number }>();
+
+  for (const camera of cameras) {
+    const point = map.project(L.latLng(camera.lat, camera.lng), zoom);
+    const key = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.cameras.push(camera);
+      existing.latSum += camera.lat;
+      existing.lngSum += camera.lng;
+    } else {
+      groups.set(key, {
+        cameras: [camera],
+        latSum: camera.lat,
+        lngSum: camera.lng,
+      });
+    }
+  }
+
+  return [...groups.values()].map((group) => ({
+    cameras: group.cameras,
+    lat: group.latSum / group.cameras.length,
+    lng: group.lngSum / group.cameras.length,
+  }));
+}
+
 interface Props {
   cameras: Camera[];
   query: string;
@@ -56,12 +119,10 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
   const layerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
 
-  // Init map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     mapRef.current = L.map(containerRef.current).setView([23.9, 121.0], 8);
 
-    // Dark-themed CartoDB tiles
     L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
       {
@@ -78,7 +139,6 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
     };
   }, []);
 
-  // Auto-zoom to user location
   useEffect(() => {
     if (!mapRef.current || !userLocation) return;
 
@@ -105,37 +165,55 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
     mapRef.current.setView([userLocation.lat, userLocation.lng], 12, { animate: true });
   }, [userLocation]);
 
-  // Render markers
   useEffect(() => {
     if (!mapRef.current || !layerRef.current) return;
 
     const renderMarkers = () => {
-      layerRef.current!.clearLayers();
+      const map = mapRef.current!;
+      const layer = layerRef.current!;
+      layer.clearLayers();
 
-      const filtered = cameras.filter((c) => {
+      const filtered = cameras.filter((camera) => {
         if (!query) return true;
         const q = query.toLowerCase();
         return (
-          c.name.toLowerCase().includes(q) ||
-          c.id.toLowerCase().includes(q) ||
-          (c.road?.toLowerCase().includes(q) ?? false)
+          camera.name.toLowerCase().includes(q) ||
+          camera.id.toLowerCase().includes(q) ||
+          (camera.road?.toLowerCase().includes(q) ?? false)
         );
       });
 
-      const center = mapRef.current!.getCenter();
-      const candidates = filtered
-        .map((camera) => {
-          const distance = getDistance(center.lat, center.lng, camera.lat, camera.lng);
-          return { camera, distance };
-        })
-        .sort((a, b) => a.distance - b.distance);
+      const zoom = map.getZoom();
+      const clusters = clusterCameras(map, filtered, zoom);
 
-      const zoom = mapRef.current!.getZoom();
-      const MAX_MARKERS = zoom > 10 ? 200 : zoom > 8 ? 100 : 50;
-      const shown = candidates.slice(0, MAX_MARKERS);
+      clusters.forEach((cluster) => {
+        if (cluster.cameras.length > 1) {
+          const marker = L.marker([cluster.lat, cluster.lng], {
+            icon: makeClusterIcon(cluster.cameras.length),
+            zIndexOffset: 800,
+            keyboard: true,
+            title: `${cluster.cameras.length} 支監視器`,
+          });
 
-      shown.forEach(({ camera }) => {
-        const marker = L.marker([camera.lat, camera.lng], { icon: makeIcon(camera.type), zIndexOffset: 1000 });
+          marker.on('click', () => {
+            map.setView([cluster.lat, cluster.lng], Math.min(zoom + 2, 16), {
+              animate: true,
+              duration: 0.6,
+            });
+          });
+
+          marker.addTo(layer);
+          return;
+        }
+
+        const camera = cluster.cameras[0];
+        if (!camera) return;
+
+        const marker = L.marker([camera.lat, camera.lng], {
+          icon: makeIcon(camera.type),
+          zIndexOffset: 1000,
+          title: camera.name,
+        });
         const color = COLORS[camera.type];
 
         const previewContent = `
@@ -153,7 +231,7 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
                 ${camera.road ?? '—'}
               </div>
               <div style="padding-top:8px; border-top:1px solid rgba(255,255,255,0.06); color:${color}; font-size:10px; font-weight:700; text-align:center; letter-spacing:0.05em;">
-                CLICK TO VIEW LIVE
+                點擊查看
               </div>
             </div>
           </div>
@@ -163,38 +241,36 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
           .setContent(previewContent);
 
         marker.on('mouseover', () => {
-          popup.setLatLng(marker.getLatLng()).openOn(mapRef.current!);
+          popup.setLatLng(marker.getLatLng()).openOn(map);
         });
 
         marker.on('mouseout', () => {
-          mapRef.current?.closePopup(popup);
+          map.closePopup(popup);
         });
 
         marker.on('click', () => {
-          const currentZoom = mapRef.current!.getZoom();
-          mapRef.current!.setView(marker.getLatLng(), Math.max(currentZoom, 13), {
+          const currentZoom = map.getZoom();
+          map.setView(marker.getLatLng(), Math.max(currentZoom, 13), {
             animate: true,
-            duration: 0.8
+            duration: 0.8,
           });
-          mapRef.current?.closePopup(popup);
+          map.closePopup(popup);
           onSelect(camera);
         });
 
-        marker.addTo(layerRef.current!);
+        marker.addTo(layer);
       });
-
-      if (candidates.length > MAX_MARKERS) {
-        console.log(`顯示 ${MAX_MARKERS} 個 marker（共 ${candidates.length} 個）`);
-      }
     };
 
     renderMarkers();
 
     const handleMapChange = () => renderMarkers();
     mapRef.current.on('moveend', handleMapChange);
+    mapRef.current.on('zoomend', handleMapChange);
 
     return () => {
       mapRef.current?.off('moveend', handleMapChange);
+      mapRef.current?.off('zoomend', handleMapChange);
     };
   }, [cameras, query, onSelect]);
 
