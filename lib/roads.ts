@@ -22,7 +22,7 @@ export function getCameraRoadNumber(camera: Camera): string | undefined {
   return normalizeRoadNumber(camera.road) ?? normalizeRoadNumber(camera.name);
 }
 
-function normalizeRoadNumber(value?: string): string | undefined {
+export function normalizeRoadNumber(value?: string): string | undefined {
   if (!value) return undefined;
   const normalized = value
     .normalize('NFKC')
