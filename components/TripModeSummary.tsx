@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { Camera } from '@/types/camera';
 import type { RouteCorridor } from '@/types/route-corridor';
 
 interface Props {
@@ -18,17 +19,112 @@ function rainfallLabel(corridor: RouteCorridor): string {
   return `${corridor.summary.maxPast1Hr.toFixed(1)} mm`;
 }
 
+function cameraMeta(camera: Camera): string {
+  const parts: string[] = [];
+  if (camera.direction) parts.push(camera.direction);
+  if (camera.mile !== undefined) parts.push(`${camera.mile}K`);
+  return parts.join(' · ');
+}
+
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+}
+
+function corridorUrl(corridor: RouteCorridor, cameraId?: string): string {
+  const url = new URL(window.location.href);
+  url.searchParams.set('road', corridor.roadNumber);
+
+  if (corridor.direction) url.searchParams.set('direction', corridor.direction);
+  else url.searchParams.delete('direction');
+
+  if (cameraId) url.searchParams.set('camera', cameraId);
+  else url.searchParams.delete('camera');
+
+  // A corridor share should reopen the road context without unrelated filters
+  // accidentally narrowing it to an empty result set.
+  url.searchParams.delete('q');
+  url.searchParams.delete('type');
+  url.searchParams.delete('nearby');
+
+  return url.toString();
+}
+
 export default function TripModeSummary({ corridor }: Props) {
   const [open, setOpen] = useState(false);
+  const [cameraIndex, setCameraIndex] = useState(0);
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setOpen(window.matchMedia('(min-width: 768px)').matches);
   }, [corridor.roadNumber]);
 
+  useEffect(() => {
+    setCameraIndex(0);
+  }, [corridor.direction, corridor.roadNumber]);
+
+  useEffect(() => {
+    if (cameraIndex < corridor.cameras.length) return;
+    setCameraIndex(Math.max(0, corridor.cameras.length - 1));
+  }, [cameraIndex, corridor.cameras.length]);
+
+  const selectedCamera = corridor.cameras[cameraIndex];
+  const selectedCameraMeta = useMemo(
+    () => selectedCamera ? cameraMeta(selectedCamera) : '',
+    [selectedCamera],
+  );
+
   const tdxAvailable = corridor.sources.trafficFlow === 'available'
     || corridor.sources.trafficEvents === 'available'
     || corridor.sources.cms === 'available';
+
+  const handleShare = async () => {
+    const shareUrl = corridorUrl(corridor);
+    const directionText = corridor.direction ? ` ${corridor.direction}` : '';
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${corridor.roadNumber}${directionText} 沿線路況`,
+          text: `${corridor.roadNumber}${directionText} 沿線即時交通情境`,
+          url: shareUrl,
+        });
+        return;
+      }
+
+      await copyText(shareUrl);
+      setShareStatus('copied');
+      window.setTimeout(() => setShareStatus('idle'), 1800);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      try {
+        await copyText(shareUrl);
+        setShareStatus('copied');
+        window.setTimeout(() => setShareStatus('idle'), 1800);
+      } catch {
+        // The current URL remains available for manual copying.
+      }
+    }
+  };
+
+  const openCamera = (camera: Camera) => {
+    // Re-enter the existing camera workflow instead of creating a second viewer:
+    // mobile restores the Bottom Sheet; desktop restores the snapshot-first Modal.
+    window.location.assign(corridorUrl(corridor, camera.id));
+  };
 
   return (
     <div className="pointer-events-none absolute bottom-[8rem] left-3 z-[880] md:bottom-3">
@@ -50,22 +146,37 @@ export default function TripModeSummary({ corridor }: Props) {
                   TRIP MODE
                 </span>
                 <span className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>
-                  {corridor.roadNumber} 沿線
+                  {corridor.roadNumber}{corridor.direction ? ` ${corridor.direction}` : ''} 沿線
                 </span>
               </div>
               <p className="mt-1 text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                 道路情境聚合，非 A→B 導航路線
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="收合沿線摘要"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-              style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
-            >
-              ×
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label={`分享 ${corridor.roadNumber} 沿線路況`}
+                className="flex h-9 items-center justify-center rounded-full px-2.5 text-[10px] font-bold"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  color: shareStatus === 'copied' ? '#6ee7b7' : 'var(--text-secondary)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                {shareStatus === 'copied' ? '已複製' : '分享'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="收合沿線摘要"
+                className="flex h-9 w-9 items-center justify-center rounded-full"
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -95,6 +206,64 @@ export default function TripModeSummary({ corridor }: Props) {
             />
           </div>
 
+          {selectedCamera && (
+            <div className="mt-3 rounded-xl p-2.5"
+              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(129,140,248,0.24)' }}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold" style={{ color: '#a5b4fc' }}>
+                  沿線 CCTV {cameraIndex + 1}/{corridor.cameras.length}
+                </span>
+                <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                  依里程排序
+                </span>
+              </div>
+              <div className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                {selectedCamera.name}
+              </div>
+              {selectedCameraMeta && (
+                <div className="mt-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  {selectedCameraMeta}
+                </div>
+              )}
+              <div className="mt-2 grid grid-cols-[1fr_1fr_1.35fr] gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCameraIndex((index) => Math.max(0, index - 1))}
+                  disabled={cameraIndex === 0}
+                  className="min-h-10 rounded-lg text-[10px] font-bold"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-secondary)',
+                    opacity: cameraIndex === 0 ? 0.4 : 1,
+                  }}
+                >
+                  上一支
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCameraIndex((index) => Math.min(corridor.cameras.length - 1, index + 1))}
+                  disabled={cameraIndex >= corridor.cameras.length - 1}
+                  className="min-h-10 rounded-lg text-[10px] font-bold"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-secondary)',
+                    opacity: cameraIndex >= corridor.cameras.length - 1 ? 0.4 : 1,
+                  }}
+                >
+                  下一支
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openCamera(selectedCamera)}
+                  className="min-h-10 rounded-lg text-[10px] font-black"
+                  style={{ background: '#4f46e5', color: '#fff' }}
+                >
+                  查看 CCTV
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mt-3 flex flex-wrap gap-1.5">
             <SourceBadge label="CCTV" available={corridor.sources.cameras === 'available'} />
             <SourceBadge label="TDX" available={tdxAvailable} />
@@ -121,7 +290,7 @@ export default function TripModeSummary({ corridor }: Props) {
           aria-label={`開啟 ${corridor.roadNumber} 沿線摘要`}
         >
           <span aria-hidden="true">⇢</span>
-          <span>{corridor.roadNumber} 沿線</span>
+          <span>{corridor.roadNumber}{corridor.direction ? ` ${corridor.direction}` : ''} 沿線</span>
           {(corridor.summary.congestionSegmentCount > 0 || corridor.summary.eventCount > 0) && (
             <span className="rounded-full px-1.5 py-0.5 font-mono text-[9px]"
               style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}>
