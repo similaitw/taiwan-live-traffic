@@ -176,7 +176,7 @@ function verificationBlock(nearest: NearestCamera | null, onVerify: (camera: Cam
   info.style.fontSize = '10px'; info.style.lineHeight = '1.45'; info.style.color = '#9ca3af'; info.style.marginBottom = '7px';
   verifier.appendChild(info);
   const button = document.createElement('button');
-  button.type = 'button'; button.textContent = '查看最近監視器'; button.style.width = '100%'; button.style.padding = '7px 10px'; button.style.borderRadius = '9px'; button.style.border = '1px solid rgba(59,130,246,0.5)'; button.style.background = 'rgba(59,130,246,0.16)'; button.style.color = '#93c5fd'; button.style.fontSize = '11px'; button.style.fontWeight = '800'; button.style.cursor = 'pointer';
+  button.type = 'button'; button.textContent = '查看附近監視器'; button.style.width = '100%'; button.style.padding = '7px 10px'; button.style.borderRadius = '9px'; button.style.border = '1px solid rgba(59,130,246,0.5)'; button.style.background = 'rgba(59,130,246,0.16)'; button.style.color = '#93c5fd'; button.style.fontSize = '11px'; button.style.fontWeight = '800'; button.style.cursor = 'pointer';
   button.addEventListener('click', () => onVerify(nearest.camera));
   verifier.appendChild(button);
   return verifier;
@@ -190,9 +190,9 @@ function cmsSignature(device: CmsDevice, nearest: NearestCamera | null): string 
   return [device.id, device.status, device.messageStatus, device.messages.join('||'), device.dataCollectTime, nearest?.camera.id, nearest ? Math.round(nearest.distance) : undefined].join('|');
 }
 
-function rainfallSignature(station: RainfallStation): string {
+function rainfallSignature(station: RainfallStation, nearest: NearestCamera | null): string {
   const rain = station.rainfall;
-  return [station.id, station.observedAt, rain.now, rain.past10Min, rain.past1Hr, rain.past3Hr, rain.past6Hr, rain.past12Hr, rain.past24Hr].join('|');
+  return [station.id, station.observedAt, rain.now, rain.past10Min, rain.past1Hr, rain.past3Hr, rain.past6Hr, rain.past12Hr, rain.past24Hr, nearest?.camera.id, nearest ? Math.round(nearest.distance) : undefined].join('|');
 }
 
 function flowAnchor(segment: TrafficFlowMapSegment): [number, number] | null {
@@ -321,8 +321,8 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
   useEffect(() => {
     const map = mapRef.current; const layer = rainfallLayerRef.current;
     if (!map || !layer) return;
-    const createPopup = (station: RainfallStation): HTMLElement => {
-      const root = document.createElement('div'); root.style.width = '220px'; root.style.fontFamily = "'Noto Sans TC',sans-serif";
+    const createPopup = (station: RainfallStation, nearest: NearestCamera | null): HTMLElement => {
+      const root = document.createElement('div'); root.style.width = '230px'; root.style.fontFamily = "'Noto Sans TC',sans-serif";
       const badge = document.createElement('span'); badge.textContent = 'CWA 雨量站'; badge.style.fontSize = '10px'; badge.style.fontWeight = '800'; badge.style.color = '#7dd3fc'; badge.style.border = '1px solid rgba(56,189,248,.42)'; badge.style.background = 'rgba(14,165,233,.12)'; badge.style.padding = '2px 7px'; badge.style.borderRadius = '9999px'; root.appendChild(badge);
       const title = document.createElement('div'); title.textContent = station.name; title.style.marginTop = '8px'; title.style.fontSize = '13px'; title.style.fontWeight = '800'; title.style.color = '#e8ecf4'; root.appendChild(title);
       const location = document.createElement('div'); location.textContent = [station.county, station.town].filter(Boolean).join(' · ') || station.id; location.style.fontSize = '10px'; location.style.color = '#94a3b8'; location.style.marginTop = '3px'; root.appendChild(location);
@@ -330,18 +330,22 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
       const values: Array<[string, number | undefined]> = [['10 分鐘', station.rainfall.past10Min], ['1 小時', station.rainfall.past1Hr], ['3 小時', station.rainfall.past3Hr], ['24 小時', station.rainfall.past24Hr]];
       for (const [label, amount] of values) { const cell = document.createElement('div'); cell.style.padding = '7px'; cell.style.borderRadius = '8px'; cell.style.background = 'rgba(255,255,255,.04)'; const labelEl = document.createElement('div'); labelEl.textContent = label; labelEl.style.fontSize = '9px'; labelEl.style.color = '#64748b'; const valueEl = document.createElement('div'); valueEl.textContent = amount === undefined ? '—' : `${amount.toFixed(1)} mm`; valueEl.style.fontSize = '12px'; valueEl.style.fontWeight = '800'; valueEl.style.color = amount && amount > 0 ? '#7dd3fc' : '#cbd5e1'; cell.appendChild(labelEl); cell.appendChild(valueEl); grid.appendChild(cell); }
       root.appendChild(grid);
-      const time = formatTime(station.observedAt); if (time) { const meta = document.createElement('div'); meta.textContent = `觀測 ${time}`; meta.style.fontSize = '10px'; meta.style.color = '#6b7280'; meta.style.marginTop = '7px'; root.appendChild(meta); }
+      const time = formatTime(station.observedAt); if (time) { const meta = document.createElement('div'); meta.textContent = `測站觀測 ${time}`; meta.style.fontSize = '10px'; meta.style.color = '#6b7280'; meta.style.marginTop = '7px'; root.appendChild(meta); }
+      if (nearest && nearest.distance <= 15_000) {
+        const note = document.createElement('div'); note.textContent = '下方 CCTV 為附近位置的現場影像，與雨量測站位置不同。'; note.style.fontSize = '9px'; note.style.lineHeight = '1.45'; note.style.color = '#64748b'; note.style.marginTop = '8px'; root.appendChild(note);
+      }
+      const verify = verificationBlock(nearest, (camera) => { map.closePopup(); onSelect(camera); }); if (verify) root.appendChild(verify);
       return root;
     };
     const render = () => {
       const bounds = map.getBounds().pad(0.35); const visible = rainfallStations.filter((station) => Number.isFinite(station.lat) && Number.isFinite(station.lng) && bounds.contains([station.lat, station.lng])); const next = new Set<string>();
-      for (const station of visible) { const key = `rain:${station.id}`; const signature = rainfallSignature(station); next.add(key); const existing = renderedRainfallRef.current.get(key); if (existing?.signature === signature) continue; if (existing) layer.removeLayer(existing.marker); const marker = L.marker([station.lat, station.lng], { icon: makeRainfallIcon(station), zIndexOffset: 1200, keyboard: true, title: `${station.name} 近1小時雨量` }); marker.bindPopup(createPopup(station), { maxWidth: 250, className: 'leaflet-camera-preview' }); marker.addTo(layer); renderedRainfallRef.current.set(key, { marker, signature }); }
+      for (const station of visible) { const nearest = findNearestCamera(cameras, station.lat, station.lng); const key = `rain:${station.id}`; const signature = rainfallSignature(station, nearest); next.add(key); const existing = renderedRainfallRef.current.get(key); if (existing?.signature === signature) continue; if (existing) layer.removeLayer(existing.marker); const marker = L.marker([station.lat, station.lng], { icon: makeRainfallIcon(station), zIndexOffset: 1200, keyboard: true, title: `${station.name} 近1小時雨量` }); marker.bindPopup(createPopup(station, nearest), { maxWidth: 260, className: 'leaflet-camera-preview' }); marker.addTo(layer); renderedRainfallRef.current.set(key, { marker, signature }); }
       for (const [key, rendered] of renderedRainfallRef.current) if (!next.has(key)) { layer.removeLayer(rendered.marker); renderedRainfallRef.current.delete(key); }
     };
     const schedule = () => { if (rainfallFrameRef.current !== null) cancelAnimationFrame(rainfallFrameRef.current); rainfallFrameRef.current = requestAnimationFrame(() => { rainfallFrameRef.current = null; render(); }); };
     schedule(); map.on('moveend', schedule); map.on('zoomend', schedule);
     return () => { map.off('moveend', schedule); map.off('zoomend', schedule); if (rainfallFrameRef.current !== null) cancelAnimationFrame(rainfallFrameRef.current); };
-  }, [rainfallStations]);
+  }, [cameras, onSelect, rainfallStations]);
 
   useEffect(() => {
     const map = mapRef.current; const layer = cmsLayerRef.current;
