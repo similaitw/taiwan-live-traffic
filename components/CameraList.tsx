@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { Camera } from '@/types/camera';
+import { matchesCameraSearch } from '@/lib/camera-search';
 import CameraCard from './CameraCard';
 
 const INITIAL_LOAD = 4;
@@ -28,15 +29,7 @@ export default function CameraList({
   const observerRef = useRef<IntersectionObserver | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const filtered = cameras.filter((c) => {
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.id.toLowerCase().includes(q) ||
-      (c.road?.toLowerCase().includes(q) ?? false)
-    );
-  });
+  const filtered = cameras.filter((camera) => matchesCameraSearch(camera, query));
 
   const visible = filtered.slice(0, displayCount);
 
