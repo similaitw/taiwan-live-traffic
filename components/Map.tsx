@@ -14,6 +14,8 @@ import MapLayerControls, {
   type CmsLayerFilter,
   type EventLayerFilter,
   type FlowLayerFilter,
+  type LayerHealth,
+  type LayerHealthStatus,
   type RainfallLayerFilter,
 } from '@/components/MapLayerControls';
 
@@ -40,6 +42,8 @@ interface StoredLayerPreferences {
   eventFilter?: EventLayerFilter;
 }
 
+type ApiSourceStatus = 'ok' | 'partial' | 'disabled' | 'error';
+
 function isRainfallFilter(value: unknown): value is RainfallLayerFilter {
   return value === 'rainy' || value === 'all';
 }
@@ -56,26 +60,65 @@ function isEventFilter(value: unknown): value is EventLayerFilter {
   return value === 'all' || value === 'important' || value === 'serious';
 }
 
+function latestTimestamp(values: Array<string | undefined>): string | undefined {
+  let latest: { value: string; time: number } | undefined;
+  for (const value of values) {
+    if (!value) continue;
+    const time = new Date(value).getTime();
+    if (!Number.isFinite(time)) continue;
+    if (!latest || time > latest.time) latest = { value, time };
+  }
+  return latest?.value;
+}
+
+function sourceHealth(
+  provider: string,
+  status: ApiSourceStatus,
+  updatedAt?: string,
+  staleAfterMs?: number,
+  detail?: string,
+): LayerHealth {
+  let healthStatus: LayerHealthStatus = status;
+  if (status === 'ok' && updatedAt && staleAfterMs) {
+    const updatedTime = new Date(updatedAt).getTime();
+    if (Number.isFinite(updatedTime) && Date.now() - updatedTime > staleAfterMs) {
+      healthStatus = 'stale';
+    }
+  }
+  return { status: healthStatus, provider, updatedAt, detail };
+}
+
+function sourceDetail(status: ApiSourceStatus, partialDetail?: string): string | undefined {
+  if (status === 'disabled') return '需要 TDX 金鑰';
+  if (status === 'error') return '目前無法取得資料';
+  if (status === 'partial') return partialDetail ?? '部分來源暫時不可用';
+  return undefined;
+}
+
 export default function Map({ cameras, query, onSelect, userLocation }: Props) {
   const [trafficEvents, setTrafficEvents] = useState<TrafficEvent[]>([]);
   const [trafficEnabled, setTrafficEnabled] = useState(false);
+  const [eventsHealth, setEventsHealth] = useState<LayerHealth>({ status: 'loading', provider: 'TDX' });
   const [showTrafficEvents, setShowTrafficEvents] = useState(true);
   const [eventFilter, setEventFilter] = useState<EventLayerFilter>('all');
 
   const [trafficFlow, setTrafficFlow] = useState<TrafficFlowResponse | null>(null);
   const [trafficSections, setTrafficSections] = useState<TrafficSectionsResponse | null>(null);
   const [flowEnabled, setFlowEnabled] = useState(false);
+  const [flowHealth, setFlowHealth] = useState<LayerHealth>({ status: 'loading', provider: 'TDX' });
   const [showTrafficFlow, setShowTrafficFlow] = useState(true);
   const [flowFilter, setFlowFilter] = useState<FlowLayerFilter>('all');
 
   const [cmsDevices, setCmsDevices] = useState<CmsDevice[]>([]);
   const [cmsEnabled, setCmsEnabled] = useState(false);
+  const [cmsHealth, setCmsHealth] = useState<LayerHealth>({ status: 'loading', provider: 'TDX' });
   const [showCms, setShowCms] = useState(true);
   const [cmsFilter, setCmsFilter] = useState<CmsLayerFilter>('active');
   const [cmsRoad, setCmsRoad] = useState('');
 
   const [rainfallStations, setRainfallStations] = useState<RainfallStation[]>([]);
   const [rainfallEnabled, setRainfallEnabled] = useState(false);
+  const [rainfallHealth, setRainfallHealth] = useState<LayerHealth>({ status: 'loading', provider: 'CWA' });
   const [showRainfall, setShowRainfall] = useState(true);
   const [rainfallFilter, setRainfallFilter] = useState<RainfallLayerFilter>('rainy');
   const [showRadar, setShowRadar] = useState(false);
@@ -145,11 +188,19 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         if (cancelled) return;
         setTrafficEnabled(payload.enabled);
         setTrafficEvents(payload.enabled ? payload.events : []);
+        setEventsHealth(sourceHealth(
+          payload.source.provider,
+          payload.source.status,
+          payload.source.fetchedAt,
+          undefined,
+          sourceDetail(payload.source.status),
+        ));
       })
       .catch(() => {
         if (cancelled) return;
         setTrafficEnabled(false);
         setTrafficEvents([]);
+        setEventsHealth({ status: 'error', provider: 'TDX', detail: '無法連線至事件資料' });
       });
     return () => { cancelled = true; };
   }, []);
@@ -174,6 +225,24 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
       setTrafficFlow(flow);
       setTrafficSections(sections);
       setFlowEnabled(Boolean(flow?.enabled && sections?.enabled));
+
+      if (!flow || !sections) {
+        setFlowHealth({ status: 'error', provider: 'TDX', detail: '路況或路段資料暫時無法取得' });
+        return;
+      }
+
+      let status: ApiSourceStatus = 'ok';
+      if (flow.source.status === 'disabled' || sections.source.status === 'disabled') status = 'disabled';
+      else if (flow.source.status === 'error' || sections.source.status === 'error') status = 'error';
+      else if (sections.source.status === 'partial') status = 'partial';
+
+      setFlowHealth(sourceHealth(
+        'TDX',
+        status,
+        flow.source.dataCollectTime ?? flow.source.fetchedAt,
+        10 * 60 * 1000,
+        sourceDetail(status, '部分路段幾何暫時不可用'),
+      ));
     });
     return () => { cancelled = true; };
   }, []);
@@ -189,11 +258,20 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         if (cancelled) return;
         setCmsEnabled(payload.enabled);
         setCmsDevices(payload.enabled ? payload.devices : []);
+        const latestData = latestTimestamp(payload.devices.map((device) => device.dataCollectTime));
+        setCmsHealth(sourceHealth(
+          payload.source.provider,
+          payload.source.status,
+          latestData ?? payload.source.fetchedAt,
+          15 * 60 * 1000,
+          sourceDetail(payload.source.status, '部分 CMS 來源暫時不可用'),
+        ));
       })
       .catch(() => {
         if (cancelled) return;
         setCmsEnabled(false);
         setCmsDevices([]);
+        setCmsHealth({ status: 'error', provider: 'TDX', detail: '無法連線至 CMS 資料' });
       });
     return () => { cancelled = true; };
   }, []);
@@ -209,11 +287,19 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         if (cancelled) return;
         setRainfallEnabled(payload.enabled);
         setRainfallStations(payload.enabled ? payload.stations : []);
+        setRainfallHealth(sourceHealth(
+          payload.source.provider,
+          payload.source.status,
+          payload.source.observedAt ?? payload.source.fetchedAt,
+          25 * 60 * 1000,
+          payload.source.status === 'error' ? '目前無法取得雨量資料' : undefined,
+        ));
       })
       .catch(() => {
         if (cancelled) return;
         setRainfallEnabled(false);
         setRainfallStations([]);
+        setRainfallHealth({ status: 'error', provider: 'CWA', detail: '無法連線至雨量資料' });
       });
     return () => { cancelled = true; };
   }, []);
@@ -328,6 +414,7 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
 
       <MapLayerControls
         rainfallEnabled={rainfallEnabled}
+        rainfallHealth={rainfallHealth}
         showRainfall={showRainfall}
         onToggleRainfall={() => setShowRainfall((value) => !value)}
         rainfallFilter={rainfallFilter}
@@ -337,6 +424,7 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         showRadar={showRadar}
         onToggleRadar={() => setShowRadar((value) => !value)}
         cmsEnabled={cmsEnabled}
+        cmsHealth={cmsHealth}
         showCms={showCms}
         onToggleCms={() => setShowCms((value) => !value)}
         cmsFilter={cmsFilter}
@@ -347,6 +435,7 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         cmsCount={filteredCmsDevices.length}
         cmsTotal={cmsDevices.length}
         flowEnabled={flowEnabled}
+        flowHealth={flowHealth}
         showFlow={showTrafficFlow}
         onToggleFlow={() => setShowTrafficFlow((value) => !value)}
         flowFilter={flowFilter}
@@ -354,6 +443,7 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         flowCount={filteredCongestionSegments.length}
         flowTotal={congestionSegments.length}
         eventsEnabled={trafficEnabled}
+        eventsHealth={eventsHealth}
         showEvents={showTrafficEvents}
         onToggleEvents={() => setShowTrafficEvents((value) => !value)}
         eventFilter={eventFilter}
