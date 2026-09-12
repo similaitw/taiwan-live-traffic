@@ -6,25 +6,36 @@
 
 ## Current task
 
-### M12.3 — Corridor navigation / share state
+### M13.1 — Search V2 matching foundation
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 讓 Trip Mode 沿線摘要可分享，沿用既有 URL state，不建立新的登入或後端儲存。
-- [ ] URL 至少保留 `road=`；若加入方向狀態，使用 `direction=` 並與道路模式一致。
-- [ ] 沿線 Camera 導覽沿用 mile 排序與現有 snapshot-first detail，不重複建立另一套 Camera viewer。
-- [ ] 分享按鈕優先 Web Share API，fallback 複製網址。
-- [ ] 重新開啟分享網址後應恢復道路 corridor context；無效 road/direction 必須安全忽略。
-- [ ] 不把 road corridor 宣稱成導航路徑；仍維持「沿線情境」定位。
+- [ ] 建立共用 Camera 搜尋 utility，不再把欄位比對邏輯散落在 `app/page.tsx`。
+- [ ] 搜尋至少支援：Camera 名稱、ID、道路名稱、道路編號、縣市、行政區、公里數、方向與 tags。
+- [ ] 查詢與資料文字採 NFKC / trim / case-insensitive 正規化；臺／台差異不得影響道路與地區常見搜尋。
+- [ ] 公里數搜尋支援常見 `38K` / `38.2K` / `38+200` 等輸入，不要求使用者完全符合來源格式。
+- [ ] 回傳可供下一階段分類建議使用的 match metadata，但 M13.1 不改現有搜尋 UI。
+- [ ] 空查詢維持顯示全部 Camera；不破壞道路、收藏、最近、附近等既有 filter。
+- [ ] 不導入外部搜尋服務或新狀態管理套件。
 - [ ] GitHub Actions CI build 通過。
 
-完成後 M12 Route / Trip Mode 結案，再評估下一階段。
+完成後將 Current task 更新成 M13.2 — Categorized search suggestions。
 
 ---
 
 ## 已完成任務
+
+### M12.3 — Corridor navigation / share state（已完成）
+- [x] Trip Mode 新增沿線分享按鈕；支援 Web Share API，fallback 複製網址。
+- [x] 分享網址固定保留 `road=`；若 corridor 未來帶 direction，會使用 `direction=`，未提供方向則安全移除。
+- [x] corridor 分享移除 `camera/q/type/nearby` 等可能意外縮窄結果的狀態，重新開啟可恢復道路情境。
+- [x] 沿線 Camera 導覽直接使用 M12.1 已依 mile 排序的 `corridor.cameras`。
+- [x] 上一支／下一支只切換沿線 Camera；「查看 CCTV」帶 `camera=` 回到既有 detail workflow，不建立第二套 viewer。
+- [x] 手機仍使用 Bottom Sheet、桌面仍使用 snapshot-first Modal；不因 Trip Mode 自動啟動 LIVE。
+- [x] UI 持續標示「道路情境聚合，非 A→B 導航路線」。
+- [x] GitHub Actions run `34724413433` 成功。
 
 ### M12.2 — Trip Mode UI / corridor summary（已完成）
 - [x] 新增 `components/TripModeSummary.tsx`，提供桌面完整卡片與手機可收合摘要。
@@ -173,7 +184,12 @@
 ### M12 — Route / Trip Mode
 - [x] M12.1 Route corridor foundation
 - [x] M12.2 Trip Mode UI / corridor summary
-- [ ] M12.3 Corridor navigation / share state — **ChatGPT**
+- [x] M12.3 Corridor navigation / share state
+
+### M13 — Search V2
+- [ ] M13.1 Search matching foundation — **ChatGPT**
+- [ ] M13.2 Categorized search suggestions
+- [ ] M13.3 Search selection / URL polish
 
 ---
 
