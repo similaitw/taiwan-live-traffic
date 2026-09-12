@@ -8,24 +8,32 @@
 
 ## Current task
 
-### M15.1 — GitHub Actions runtime / build-cache modernization
+### M15.2 — Scheduled dependency audit / cache effectiveness
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 確認 `actions/checkout` / `actions/setup-node` 目前官方穩定 major，處理 runner 對舊 action Node runtime 的 deprecation warning。
-- [ ] 保持 Node.js 22 作為專案 build runtime，不因 action 自身 runtime 升級而改變應用程式 Node 版本。
-- [ ] 評估並加入安全的 Next.js `.next/cache` GitHub Actions cache，降低重複 production build 成本；cache miss 必須安全 fallback。
-- [ ] 保留 `npm ci`、`npm audit --audit-level=high`、`npm run build` 三道驗證。
-- [ ] 不使用 write permissions，不引入第三方未知 action。
+- [ ] 驗證 M15.1 建立的 `.next/cache` 在後續不改程式來源的 CI run 能命中／還原；cache miss 仍需安全 fallback。
+- [ ] 評估加入低頻 scheduled dependency audit，讓沒有新 commit 時也能發現新公布的 high / critical npm advisory。
+- [ ] scheduled job 僅需 `contents: read`，不得自動修改套件或 push main。
+- [ ] scheduled audit 使用 Node 22 + `npm ci` + `npm audit --audit-level=high`，不需每次排程都跑完整 production build。
+- [ ] 保留既有 push / pull_request CI 的 audit + build gate。
 - [ ] GitHub Actions CI 全流程通過。
 
-完成後再評估 M15.2 是否需要把 CI 拆成 dependency audit / build jobs 或加入 scheduled audit。
+完成後 M15 CI modernization 結案。
 
 ---
 
 ## 近期完成
+
+### M15.1 — GitHub Actions runtime / build-cache modernization（完成）
+- [x] 官方最新穩定版確認：`actions/checkout@v7.0.1`、`actions/setup-node@v7.0.0`、`actions/cache@v6.1.0`。
+- [x] 專案應用程式 runtime 保持 Node.js 22；只升級 action 自身 runtime / implementation。
+- [x] 新增 `.next/cache` restore/save；key 綁定 OS、package-lock 與 JS/TS/CSS source hash，cache miss 可安全重建。
+- [x] 保留 `npm ci`、`npm audit --audit-level=high`、`npm run build`。
+- [x] workflow 維持 `contents: read`，只使用 GitHub 官方 actions。
+- [x] GitHub Actions run `34725249161` 全綠。
 
 ### M14 — Dependency / CI security（完成）
 - [x] Next.js `16.2.1` → `16.3.5`；`fast-xml-parser` `5.5.9` → `5.11.1`，由 npm 在 GitHub runner 正式重建 lockfile。
@@ -39,11 +47,6 @@
 - [x] CameraList 與首頁共用同一 matcher；Map 直接使用首頁已篩好的 Camera，避免舊規則二次過濾。
 - [x] M13.2 分類建議：道路／地區／監視器，去重與 score 排序，手機 max 50dvh，ArrowUp/Down、Enter、Escape。CI `34724916576`。
 - [x] M13.3 搜尋選取／ARIA polish：桌面與手機 listbox ID 唯一、Enter 可直接選第一項；既有 `q/road/camera` URL state 與 snapshot-first detail workflow 沿用。CI `34724980764`。
-
-### M12 — Route / Trip Mode（完成）
-- [x] M12.1 Route corridor aggregation。CI `34712316259`。
-- [x] M12.2 Trip Mode UI / corridor summary。CI `34712481748`。
-- [x] M12.3 corridor share + mile-sorted Camera navigation。CI `34724413433`。
 
 ---
 
