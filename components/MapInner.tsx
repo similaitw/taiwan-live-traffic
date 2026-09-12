@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Camera } from '@/types/camera';
+import type { TrafficEvent } from '@/types/traffic-event';
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -18,6 +19,18 @@ const COLORS: Record<Camera['type'], string> = {
   county: '#f59e0b',
 };
 
+const EVENT_COLORS: Record<TrafficEvent['severity'], string> = {
+  info: '#38bdf8',
+  warning: '#f59e0b',
+  serious: '#ef4444',
+};
+
+const EVENT_LABELS: Record<TrafficEvent['severity'], string> = {
+  info: '道路事件',
+  warning: '注意',
+  serious: '嚴重',
+};
+
 interface CameraCluster {
   key: string;
   cameras: Camera[];
@@ -28,6 +41,27 @@ interface CameraCluster {
 interface RenderedMarker {
   marker: L.Marker;
   signature: string;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function formatEventTime(value?: string): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-TW', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function makeIcon(type: Camera['type']): L.DivIcon {
@@ -78,6 +112,32 @@ function makeClusterIcon(count: number): L.DivIcon {
   });
 }
 
+function makeEventIcon(severity: TrafficEvent['severity']): L.DivIcon {
+  const color = EVENT_COLORS[severity];
+  const size = severity === 'serious' ? 34 : 30;
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:${size}px;
+      height:${size}px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transform:rotate(45deg);
+      border-radius:8px;
+      color:#fff;
+      background:${color};
+      border:2px solid rgba(255,255,255,0.82);
+      box-shadow:0 0 0 5px ${color}22,0 8px 22px rgba(0,0,0,0.42);
+      font-size:15px;
+      font-weight:900;
+    "><span style="transform:rotate(-45deg);line-height:1">!</span></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -(size / 2 + 6)],
+  });
+}
+
 function clusterCameras(map: L.Map, cameras: Camera[], zoom: number): CameraCluster[] {
   if (zoom >= 15) {
     return cameras.map((camera) => ({
@@ -124,20 +184,42 @@ function clusterSignature(cluster: CameraCluster): string {
   return cluster.cameras.map((camera) => camera.id).sort().join('|');
 }
 
+function eventSignature(event: TrafficEvent): string {
+  return [
+    event.id,
+    event.severity,
+    event.lat,
+    event.lng,
+    event.title,
+    event.description,
+    event.publishTime,
+  ].join('|');
+}
+
 interface Props {
   cameras: Camera[];
   query: string;
   onSelect: (c: Camera) => void;
   userLocation?: { lat: number; lng: number } | null;
+  trafficEvents?: TrafficEvent[];
 }
 
-export default function MapInner({ cameras, query, onSelect, userLocation }: Props) {
+export default function MapInner({
+  cameras,
+  query,
+  onSelect,
+  userLocation,
+  trafficEvents = [],
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const eventLayerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const renderedMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
+  const renderedEventMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
   const renderFrameRef = useRef<number | null>(null);
+  const eventRenderFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -152,10 +234,13 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
       }
     ).addTo(mapRef.current);
     layerRef.current = L.layerGroup().addTo(mapRef.current);
+    eventLayerRef.current = L.layerGroup().addTo(mapRef.current);
 
     return () => {
       if (renderFrameRef.current !== null) cancelAnimationFrame(renderFrameRef.current);
+      if (eventRenderFrameRef.current !== null) cancelAnimationFrame(eventRenderFrameRef.current);
       renderedMarkersRef.current.clear();
+      renderedEventMarkersRef.current.clear();
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -204,16 +289,16 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
       const previewContent = `
         <div style="width:200px; font-family:'Noto Sans TC',sans-serif;">
           <div style="position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#0a0e1a; margin-bottom:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
-            <img src="/api/proxy/snapshot?url=${encodeURIComponent(camera.snapshotUrl ?? camera.streamUrl)}" alt="${camera.name}"
+            <img src="/api/proxy/snapshot?url=${encodeURIComponent(camera.snapshotUrl ?? camera.streamUrl)}" alt="${escapeHtml(camera.name)}"
               style="width:100%; height:100%; object-fit:cover;"
               onerror="this.style.display='none'"/>
           </div>
           <div style="padding:0 2px;">
             <div style="font-weight:700; color:#e8ecf4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; line-height:1.4; margin-bottom:4px;">
-              ${camera.name}
+              ${escapeHtml(camera.name)}
             </div>
             <div style="color:#4b5563; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; font-family:'JetBrains Mono',monospace;">
-              ${camera.road ?? '—'}
+              ${escapeHtml(camera.road ?? '—')}
             </div>
             <div style="padding-top:8px; border-top:1px solid rgba(255,255,255,0.06); color:${color}; font-size:10px; font-weight:700; text-align:center; letter-spacing:0.05em;">
               點擊查看
@@ -324,6 +409,102 @@ export default function MapInner({ cameras, query, onSelect, userLocation }: Pro
       }
     };
   }, [cameras, query, onSelect]);
+
+  useEffect(() => {
+    if (!mapRef.current || !eventLayerRef.current) return;
+
+    const map = mapRef.current;
+    const layer = eventLayerRef.current;
+
+    const createEventMarker = (event: TrafficEvent): L.Marker => {
+      const marker = L.marker([event.lat!, event.lng!], {
+        icon: makeEventIcon(event.severity),
+        zIndexOffset: 1600,
+        keyboard: true,
+        title: event.title,
+      });
+
+      const color = EVENT_COLORS[event.severity];
+      const publishTime = formatEventTime(event.publishTime);
+      const popupContent = `
+        <div style="width:220px;font-family:'Noto Sans TC',sans-serif;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="font-size:10px;font-weight:800;color:${color};border:1px solid ${color}55;background:${color}18;padding:2px 7px;border-radius:9999px;">
+              ${EVENT_LABELS[event.severity]}
+            </span>
+            <span style="font-size:10px;color:#6b7280;">TDX</span>
+          </div>
+          <div style="font-size:13px;font-weight:800;line-height:1.45;color:#e8ecf4;margin-bottom:6px;">
+            ${escapeHtml(event.title)}
+          </div>
+          ${event.road ? `<div style="font-size:11px;color:#9ca3af;margin-bottom:5px;">${escapeHtml(event.road)}${event.direction ? ` · ${escapeHtml(event.direction)}` : ''}</div>` : ''}
+          ${event.description ? `<div style="font-size:11px;line-height:1.55;color:#cbd5e1;margin-bottom:6px;">${escapeHtml(event.description)}</div>` : ''}
+          ${publishTime ? `<div style="font-size:10px;color:#6b7280;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;">發布 ${escapeHtml(publishTime)}</div>` : ''}
+        </div>
+      `;
+
+      marker.bindPopup(popupContent, {
+        maxWidth: 250,
+        className: 'leaflet-camera-preview',
+      });
+      return marker;
+    };
+
+    const renderEvents = () => {
+      const paddedBounds = map.getBounds().pad(0.35);
+      const visible = trafficEvents.filter((event) => {
+        if (typeof event.lat !== 'number' || typeof event.lng !== 'number') return false;
+        if (!Number.isFinite(event.lat) || !Number.isFinite(event.lng)) return false;
+        return paddedBounds.contains(L.latLng(event.lat, event.lng));
+      });
+      const nextKeys = new Set<string>();
+
+      for (const event of visible) {
+        const key = `event:${event.id}`;
+        const signature = eventSignature(event);
+        nextKeys.add(key);
+        const existing = renderedEventMarkersRef.current.get(key);
+
+        if (existing?.signature === signature) continue;
+
+        if (existing) {
+          layer.removeLayer(existing.marker);
+          renderedEventMarkersRef.current.delete(key);
+        }
+
+        const marker = createEventMarker(event);
+        marker.addTo(layer);
+        renderedEventMarkersRef.current.set(key, { marker, signature });
+      }
+
+      for (const [key, rendered] of renderedEventMarkersRef.current.entries()) {
+        if (nextKeys.has(key)) continue;
+        layer.removeLayer(rendered.marker);
+        renderedEventMarkersRef.current.delete(key);
+      }
+    };
+
+    const scheduleEventRender = () => {
+      if (eventRenderFrameRef.current !== null) cancelAnimationFrame(eventRenderFrameRef.current);
+      eventRenderFrameRef.current = requestAnimationFrame(() => {
+        eventRenderFrameRef.current = null;
+        renderEvents();
+      });
+    };
+
+    scheduleEventRender();
+    map.on('moveend', scheduleEventRender);
+    map.on('zoomend', scheduleEventRender);
+
+    return () => {
+      map.off('moveend', scheduleEventRender);
+      map.off('zoomend', scheduleEventRender);
+      if (eventRenderFrameRef.current !== null) {
+        cancelAnimationFrame(eventRenderFrameRef.current);
+        eventRenderFrameRef.current = null;
+      }
+    };
+  }, [trafficEvents]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }
