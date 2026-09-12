@@ -6,26 +6,34 @@
 
 ## Current task
 
-### M11.1 — Camera proxy redirect / SSRF hardening
+### M11.2 — Source freshness / health visibility
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 抽出共用 Camera proxy URL allowlist / validation helper，避免 image 與 snapshot proxy 各維護一份規則。
-- [ ] 僅允許 `http:` / `https:`，拒絕 URL credentials 與非 allowlist host。
-- [ ] 上游 redirect 改為手動追蹤，每一跳都重新驗證 hostname；設定合理 redirect 上限。
-- [ ] redirect 相對 URL 必須以目前上游 URL 正確解析後再驗證。
-- [ ] image/MJPEG stream proxy 與 snapshot proxy 都使用同一套安全 fetch。
-- [ ] 保留原本 timeout、snapshot MJPEG 單幀擷取與錯誤處理語意。
-- [ ] 不擴大現有允許來源清單。
+- [ ] 建立前端共用 source-health model，至少涵蓋 TDX events / flow / CMS 與 CWA rainfall。
+- [ ] 保留 API 回傳的 status / fetchedAt / dataCollectTime / observedAt，不只用 `enabled` 判斷顯示與否。
+- [ ] 圖層面板顯示資料來源健康狀態：正常、未設定、暫時失敗、資料時間。
+- [ ] 來源 unavailable 時圖層可以不可用，但需讓使用者知道原因，不再只是控制項消失。
+- [ ] stale 判定使用保守門檻，且只標示「資料可能較舊」，不把延遲誤判為服務故障。
+- [ ] Camera 主資料仍維持既有載入／錯誤顯示；本任務不重寫 `/api/cameras` response shape。
+- [ ] 不暴露 TDX credentials、上游內部錯誤堆疊或敏感資訊。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M11.2 — Source freshness / health visibility。
+完成後將 Current task 更新成 M11.3 — Live stream bandwidth / lifecycle guardrails。
 
 ---
 
 ## 已完成任務
+
+### M11.1 — Camera proxy redirect / SSRF hardening（已完成）
+- [x] image / snapshot proxy 共用單一 hostname allowlist 與 URL parser。
+- [x] 僅允許 HTTP(S)，拒絕 URL credentials 與非 allowlist host。
+- [x] redirect 改手動追蹤，每一跳重新驗證 host；最多 4 跳。
+- [x] 相對 redirect 以目前上游 URL 解析後驗證。
+- [x] 不擴大既有允許來源，保留 timeout、MJPEG 單幀擷取與快取語意。
+- [x] GitHub Actions run `34709275148` 成功。
 
 ### M10 — 圖層控制與行動版整理（已完成）
 - [x] M10.1 Unified map layer controls — CI `34709009247`
@@ -109,8 +117,8 @@
 - [x] M10.3
 
 ### M11 — Production hardening
-- [ ] M11.1 Camera proxy redirect / SSRF hardening — **ChatGPT**
-- [ ] M11.2 Source freshness / health visibility
+- [x] M11.1 Camera proxy redirect / SSRF hardening
+- [ ] M11.2 Source freshness / health visibility — **ChatGPT**
 - [ ] M11.3 Live stream bandwidth / lifecycle guardrails
 
 ---
