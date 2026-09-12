@@ -6,20 +6,34 @@
 
 ## Current task
 
-### M1.2 — 共用 geo utilities
+### M1.3 — hooks 基礎拆分
 
 目標／範圍：
 
-- [ ] 新增 `lib/geo.ts`。
-- [ ] 把 Haversine distance 從 `app/page.tsx` 與 `components/MapInner.tsx` 移出。
-- [ ] 最近排序結果保持一致。
+- [ ] 拆分 `useGeolocation`。
+- [ ] 建立 `useFavorites`。
+- [ ] 建立 `useRecentCameras`。
+- [ ] localStorage 必須 SSR safe。
 - [ ] `npm run build` 通過；若已有相關測試，也要執行。
 
-完成後更新 Current task 為 M1.3 — hooks 基礎拆分，commit 並 push 到 main。
+詳細需求需要時讀 `docs/V2_SPEC.md` 對應章節。完成後將 Current task 更新成 M2.1 — Mobile map-first layout，commit 並 push 到 main。
 
 ---
 
 ## 已完成任務
+
+### M1.2 — 共用 geo utilities（已完成）
+
+目標／範圍：
+
+- [x] 新增 `lib/geo.ts`。
+- [x] 把 Haversine distance 從 `app/page.tsx` 與 `components/MapInner.tsx` 移出。
+- [x] 最近排序結果保持一致。
+- [x] `npm run build` 通過；若已有相關測試，也要執行。
+
+驗證：`npm run build` 通過；81 組座標距離與兩份原始函式完全一致，兩份函式各 9 組最近排序（含同距離）比較通過，公尺單位檢查通過。現有專案無相關測試套件。
+
+---
 
 ### M1.1 — Camera V2 data model（已完成）
 
@@ -61,7 +75,7 @@
 ### M1 — 基礎整理與資料模型
 
 - [x] M1.1 Camera V2 data model
-- [ ] M1.2 共用 geo utilities
+- [x] M1.2 共用 geo utilities
 - [ ] M1.3 hooks 基礎拆分
 
 ### M2 — UI 2.0
@@ -90,15 +104,6 @@
 ---
 
 ## 下一任務摘要
-
-### M1.2 — 共用 geo utilities
-
-預定範圍：
-
-- 新增 `lib/geo.ts`。
-- 把 Haversine distance 從 `app/page.tsx` 與 `components/MapInner.tsx` 移出。
-- 最近排序結果保持一致。
-- `npm run build` 通過。
 
 ### M1.3 — hooks 基礎拆分
 

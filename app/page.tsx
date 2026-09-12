@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import type { Camera } from '@/types/camera';
+import { getDistance } from '@/lib/geo';
 import SearchBar from '@/components/SearchBar';
 import CameraList from '@/components/CameraList';
 import CameraModal from '@/components/CameraModal';
@@ -31,21 +32,6 @@ export default function HomePage() {
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sortByNearest, setSortByNearest] = useState(false);
-
-  const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-    const toRad = (v: number) => (v * Math.PI) / 180;
-    const R = 6371e3;
-    const φ1 = toRad(lat1);
-    const φ2 = toRad(lat2);
-    const Δφ = toRad(lat2 - lat1);
-    const Δλ = toRad(lng2 - lng1);
-    const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) *
-      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
 
   const locateMe = () => {
     if (!navigator.geolocation) {
