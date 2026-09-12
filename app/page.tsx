@@ -56,24 +56,24 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSelect = useCallback((c: Camera) => setSelected(c), []);
+  const handleSelect = useCallback((camera: Camera) => setSelected(camera), []);
 
   const filtered = cameras
-    .filter((c) => {
-      if (typeFilter !== 'all' && c.type !== typeFilter) return false;
+    .filter((camera) => {
+      if (typeFilter !== 'all' && camera.type !== typeFilter) return false;
       if (!query) return true;
       const q = query.toLowerCase();
       return (
-        c.name.toLowerCase().includes(q) ||
-        c.id.toLowerCase().includes(q) ||
-        (c.road?.toLowerCase().includes(q) ?? false)
+        camera.name.toLowerCase().includes(q) ||
+        camera.id.toLowerCase().includes(q) ||
+        (camera.road?.toLowerCase().includes(q) ?? false)
       );
     })
-    .map((c) => {
-      if (!userLocation) return { camera: c, distance: Infinity };
+    .map((camera) => {
+      if (!userLocation) return { camera, distance: Infinity };
       return {
-        camera: c,
-        distance: getDistance(userLocation.lat, userLocation.lng, c.lat, c.lng),
+        camera,
+        distance: getDistance(userLocation.lat, userLocation.lng, camera.lat, camera.lng),
       };
     });
 
@@ -91,162 +91,164 @@ export default function HomePage() {
     county: cameras.filter((c) => c.type === 'county').length,
   };
 
-  const typeChips = (compact = false) =>
-    (['all', 'freeway', 'provincial', 'county'] as const).map((t, i) => {
-      const active = typeFilter === t;
-      const color = TYPE_COLOR[t];
+  const typeChips = (floating = false) =>
+    (['all', 'freeway', 'provincial', 'county'] as const).map((type, index) => {
+      const active = typeFilter === type;
+      const color = TYPE_COLOR[type];
       return (
         <button
-          key={t}
+          key={type}
           type="button"
-          onClick={() => setTypeFilter(t)}
-          className={`shrink-0 rounded-full font-bold tracking-wide transition-all duration-200 ${compact ? 'px-3 py-2 text-xs backdrop-blur-xl' : 'px-3 py-1.5 text-xs'}`}
+          onClick={() => setTypeFilter(type)}
+          className={`shrink-0 rounded-full text-xs font-bold tracking-wide transition-all duration-200 ${floating ? 'px-3 py-2 backdrop-blur-xl' : 'px-3 py-1.5'}`}
           style={{
-            animationDelay: `${i * 50}ms`,
-            background: active ? color : compact ? 'rgba(10,14,26,0.82)' : 'rgba(255,255,255,0.04)',
+            animationDelay: `${index * 50}ms`,
+            background: active ? color : floating ? 'rgba(10,14,26,0.82)' : 'rgba(255,255,255,0.04)',
             color: active ? '#fff' : 'var(--text-secondary)',
             border: `1px solid ${active ? color : 'var(--border-subtle)'}`,
-            boxShadow: active ? `0 0 16px ${color}33` : compact ? '0 6px 20px rgba(0,0,0,0.28)' : 'none',
+            boxShadow: active ? `0 0 16px ${color}33` : floating ? '0 6px 20px rgba(0,0,0,0.28)' : 'none',
           }}
         >
-          {t === 'all'
+          {type === 'all'
             ? `全部 ${counts.all}`
-            : `${TYPE_ICON[t]} ${TYPE_LABEL[t]} ${counts[t]}`}
+            : `${TYPE_ICON[type]} ${TYPE_LABEL[type]} ${counts[type]}`}
         </button>
       );
     });
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden relative noise" style={{ background: 'var(--bg-primary)' }}>
-      {/* Ambient glow effects */}
+    <div className="h-screen overflow-hidden relative noise" style={{ background: 'var(--bg-primary)' }}>
       <div className="pointer-events-none absolute top-0 left-1/4 w-96 h-96 rounded-full opacity-20"
         style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)', filter: 'blur(60px)' }} />
       <div className="pointer-events-none absolute top-0 right-1/4 w-72 h-72 rounded-full opacity-15"
         style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)', filter: 'blur(50px)' }} />
 
-      {/* Desktop / tablet header. Mobile is map-first and uses floating controls. */}
-      <header className="relative z-30 shrink-0 glass hidden md:block" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-        <div className="px-4 py-3 flex items-center gap-3">
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="relative w-9 h-9 rounded-lg flex items-center justify-center animate-pulse-glow"
-              style={{ background: 'linear-gradient(135deg, var(--accent-freeway), #6366f1)' }}>
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M3 8a2 2 0
-                    012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
-              </svg>
+      {loading ? (
+        <div className="relative z-10 flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: 'var(--accent-freeway)' }} />
+              <div className="absolute inset-2 rounded-full animate-spin"
+                style={{ border: '2px solid var(--border-subtle)', borderTopColor: 'var(--accent-freeway)' }} />
+              <div className="absolute inset-4 rounded-full"
+                style={{ background: 'var(--accent-freeway)', opacity: 0.2 }} />
             </div>
-            <div>
-              <h1 className="font-black text-sm tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                全台監視器即時查詢
-              </h1>
-              <p className="text-[10px] font-mono tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
-                LIVE TRAFFIC CAM
-              </p>
-            </div>
-          </div>
-
-          <SearchBar value={query} onChange={setQuery} />
-
-          <div className="flex shrink-0 rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
-            {(['map', 'list'] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                className="px-3.5 py-1.5 text-xs font-bold tracking-wide transition-all duration-200"
-                style={{
-                  background: view === v ? 'var(--accent-freeway)' : 'transparent',
-                  color: view === v ? '#fff' : 'var(--text-secondary)',
-                  boxShadow: view === v ? '0 0 12px rgba(59,130,246,0.3)' : 'none',
-                }}
-              >
-                {v === 'map' ? '地圖' : '清單'}
-              </button>
-            ))}
+            <p className="text-sm font-mono tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              LOADING CAMERAS...
+            </p>
           </div>
         </div>
-      </header>
+      ) : (
+        <>
+          {/* Desktop / tablet workspace: persistent sidebar + map. */}
+          <div className="hidden md:flex h-full relative z-10">
+            <aside
+              className="w-[340px] xl:w-[380px] shrink-0 h-full flex flex-col"
+              style={{
+                background: 'rgba(10,14,26,0.94)',
+                borderRight: '1px solid var(--border-subtle)',
+                boxShadow: '12px 0 30px rgba(0,0,0,0.18)',
+              }}
+            >
+              <div className="shrink-0 p-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="relative w-10 h-10 rounded-xl flex items-center justify-center animate-pulse-glow"
+                    style={{ background: 'linear-gradient(135deg, var(--accent-freeway), #6366f1)' }}>
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="font-black text-sm tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                      全台監視器即時查詢
+                    </h1>
+                    <p className="text-[10px] font-mono tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
+                      TAIWAN LIVE TRAFFIC
+                    </p>
+                  </div>
+                </div>
 
-      {/* Desktop / tablet filters */}
-      <div className="relative z-20 shrink-0 px-4 py-2.5 hidden md:flex flex-wrap items-center gap-2 overflow-x-auto"
-        style={{ background: 'rgba(17, 24, 39, 0.6)', borderBottom: '1px solid var(--border-subtle)' }}>
-        {typeChips()}
+                <SearchBar value={query} onChange={setQuery} placeholder="搜尋道路、地點、監視器…" />
 
-        <div className="w-px h-5 mx-1" style={{ background: 'var(--border-subtle)' }} />
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {typeChips()}
+                </div>
 
-        <button
-          type="button"
-          onClick={locateMe}
-          className="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all duration-200"
-          style={{
-            background: 'rgba(16, 185, 129, 0.1)',
-            color: 'var(--accent-provincial)',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-          }}
-        >
-          <span className="inline-flex items-center gap-1">
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-            </svg>
-            定位
-          </span>
-        </button>
+                <div className="flex items-center gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={locateMe}
+                    className="flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all"
+                    style={{
+                      background: 'rgba(16,185,129,0.1)',
+                      color: 'var(--accent-provincial)',
+                      border: '1px solid rgba(16,185,129,0.2)',
+                    }}
+                  >
+                    定位
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSortByNearest((value) => !value)}
+                    disabled={!userLocation}
+                    className="flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all"
+                    style={{
+                      background: sortByNearest ? 'var(--accent-freeway)' : 'rgba(255,255,255,0.04)',
+                      color: sortByNearest ? '#fff' : 'var(--text-secondary)',
+                      border: `1px solid ${sortByNearest ? 'var(--accent-freeway)' : 'var(--border-subtle)'}`,
+                      opacity: userLocation ? 1 : 0.4,
+                    }}
+                  >
+                    離我最近
+                  </button>
+                </div>
 
-        <button
-          type="button"
-          onClick={() => setSortByNearest((v) => !v)}
-          disabled={!userLocation}
-          className="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all duration-200"
-          style={{
-            background: sortByNearest ? 'var(--accent-freeway)' : 'rgba(255,255,255,0.04)',
-            color: sortByNearest ? '#fff' : 'var(--text-secondary)',
-            border: `1px solid ${sortByNearest ? 'var(--accent-freeway)' : 'var(--border-subtle)'}`,
-            opacity: userLocation ? 1 : 0.3,
-            cursor: userLocation ? 'pointer' : 'not-allowed',
-          }}
-        >
-          離我最近
-        </button>
+                {userLocation && (
+                  <p className="mt-2 text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                    {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+                  </p>
+                )}
+                {(error || geolocationError) && (
+                  <p className="mt-2 text-xs" style={{ color: 'var(--accent-pink)' }}>
+                    {error || geolocationError}
+                  </p>
+                )}
+              </div>
 
-        {userLocation && (
-          <span className="text-[10px] font-mono px-2 py-1 rounded" style={{ color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)' }}>
-            {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
-          </span>
-        )}
+              <div className="flex-1 min-h-0 overflow-y-auto p-3">
+                <CameraList
+                  cameras={filteredCameras}
+                  query={query}
+                  onSelect={handleSelect}
+                  variant="sidebar"
+                />
+              </div>
+            </aside>
 
-        {loading && (
-          <span className="text-xs ml-2 animate-pulse" style={{ color: 'var(--accent-freeway)' }}>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: 'var(--accent-freeway)' }} />
-              載入中…
-            </span>
-          </span>
-        )}
-        {(error || geolocationError) && (
-          <span className="text-xs ml-2" style={{ color: 'var(--accent-pink)' }}>
-            {error || geolocationError}
-          </span>
-        )}
-      </div>
+            <section className="flex-1 min-w-0 h-full p-3">
+              <Map
+                cameras={filteredCameras}
+                query={query}
+                onSelect={handleSelect}
+                userLocation={userLocation}
+              />
+            </section>
+          </div>
 
-      <main className="flex-1 overflow-hidden relative">
-        {!loading && (
-          <>
-            {/* Mobile floating search */}
-            <div className="md:hidden absolute inset-x-3 top-3 z-40">
+          {/* Mobile remains map-first from M2.1. */}
+          <div className="md:hidden h-full relative z-10">
+            <div className="absolute inset-x-3 top-3 z-40">
               <div className="glass rounded-xl shadow-2xl p-1.5">
                 <SearchBar value={query} onChange={setQuery} placeholder="搜尋道路、地點、監視器…" />
               </div>
             </div>
 
-            {/* Mobile horizontal filter chips */}
-            <div className="md:hidden absolute left-3 right-3 top-[4.5rem] z-40 flex gap-2 overflow-x-auto pb-1">
+            <div className="absolute left-3 right-3 top-[4.5rem] z-40 flex gap-2 overflow-x-auto pb-1">
               {typeChips(true)}
             </div>
 
-            {/* Mobile map actions */}
-            <div className="md:hidden absolute right-3 top-[8.25rem] z-40 flex flex-col items-end gap-2">
+            <div className="absolute right-3 top-[8.25rem] z-40 flex flex-col items-end gap-2">
               <button
                 type="button"
                 onClick={locateMe}
@@ -261,7 +263,7 @@ export default function HomePage() {
 
               <button
                 type="button"
-                onClick={() => setSortByNearest((v) => !v)}
+                onClick={() => setSortByNearest((value) => !value)}
                 disabled={!userLocation}
                 aria-label="依距離排序"
                 className="h-10 px-3 rounded-full glass shadow-xl text-xs font-bold"
@@ -276,62 +278,46 @@ export default function HomePage() {
             </div>
 
             {(error || geolocationError) && (
-              <div className="md:hidden absolute left-3 right-3 top-[11.35rem] z-40 rounded-lg px-3 py-2 text-xs glass"
+              <div className="absolute left-3 right-3 top-[11.35rem] z-40 rounded-lg px-3 py-2 text-xs glass"
                 style={{ color: 'var(--accent-pink)' }}>
                 {error || geolocationError}
               </div>
             )}
 
-            {/* Mobile Map/List switch kept compact and out of the map's top controls. */}
-            <div className="md:hidden absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex rounded-full overflow-hidden glass shadow-2xl p-1">
-              {(['map', 'list'] as const).map((v) => (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex rounded-full overflow-hidden glass shadow-2xl p-1">
+              {(['map', 'list'] as const).map((mobileView) => (
                 <button
-                  key={v}
+                  key={mobileView}
                   type="button"
-                  onClick={() => setView(v)}
+                  onClick={() => setView(mobileView)}
                   className="px-4 py-2 rounded-full text-xs font-bold transition-all"
                   style={{
-                    background: view === v ? 'var(--accent-freeway)' : 'transparent',
-                    color: view === v ? '#fff' : 'var(--text-secondary)',
+                    background: view === mobileView ? 'var(--accent-freeway)' : 'transparent',
+                    color: view === mobileView ? '#fff' : 'var(--text-secondary)',
                   }}
                 >
-                  {v === 'map' ? '地圖' : '清單'}
+                  {mobileView === 'map' ? '地圖' : '清單'}
                 </button>
               ))}
             </div>
-          </>
-        )}
 
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative w-16 h-16">
-                <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: 'var(--accent-freeway)' }} />
-                <div className="absolute inset-2 rounded-full animate-spin"
-                  style={{ border: '2px solid var(--border-subtle)', borderTopColor: 'var(--accent-freeway)' }} />
-                <div className="absolute inset-4 rounded-full"
-                  style={{ background: 'var(--accent-freeway)', opacity: 0.2 }} />
+            {view === 'map' ? (
+              <div className="h-full">
+                <Map
+                  cameras={filteredCameras}
+                  query={query}
+                  onSelect={handleSelect}
+                  userLocation={userLocation}
+                />
               </div>
-              <p className="text-sm font-mono tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                LOADING CAMERAS...
-              </p>
-            </div>
+            ) : (
+              <div className="h-full overflow-y-auto px-3 pt-32 pb-24">
+                <CameraList cameras={filteredCameras} query={query} onSelect={handleSelect} />
+              </div>
+            )}
           </div>
-        ) : view === 'map' ? (
-          <div className="h-full p-0 md:p-3">
-            <Map
-              cameras={filteredCameras}
-              query={query}
-              onSelect={handleSelect}
-              userLocation={userLocation}
-            />
-          </div>
-        ) : (
-          <div className="h-full overflow-y-auto px-3 pt-32 pb-24 md:p-4">
-            <CameraList cameras={filteredCameras} query={query} onSelect={handleSelect} />
-          </div>
-        )}
-      </main>
+        </>
+      )}
 
       <CameraModal camera={selected} onClose={() => setSelected(null)} />
     </div>
