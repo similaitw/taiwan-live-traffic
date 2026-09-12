@@ -8,45 +8,39 @@
 
 ## Current task
 
-### M15.2 — Scheduled dependency audit / cache effectiveness
+### M16.1 — Production attack-surface cleanup
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 驗證 M15.1 建立的 `.next/cache` 在後續不改程式來源的 CI run 能命中／還原；cache miss 仍需安全 fallback。
-- [ ] 評估加入低頻 scheduled dependency audit，讓沒有新 commit 時也能發現新公布的 high / critical npm advisory。
-- [ ] scheduled job 僅需 `contents: read`，不得自動修改套件或 push main。
-- [ ] scheduled audit 使用 Node 22 + `npm ci` + `npm audit --audit-level=high`，不需每次排程都跑完整 production build。
-- [ ] 保留既有 push / pull_request CI 的 audit + build gate。
-- [ ] GitHub Actions CI 全流程通過。
+- [x] 移除未被產品使用、可由 query parameter 讓 server 任意 `fetch()` URL 的 `/api/test-source` 開發診斷端點。
+- [x] 搜尋 API routes 的 user-controlled `url` query；保留的 `/api/proxy/image` 與 `/api/proxy/snapshot` 必須繼續經共用 allowlist / redirect revalidation。
+- [ ] production build route list 不再出現 `/api/test-source`。
+- [ ] `npm audit --audit-level=high` 與 `npm run build` 通過。
 
-完成後 M15 CI modernization 結案。
+完成後再評估 M16.2 是否需要補 security regression tests / route allowlist tests。
 
 ---
 
 ## 近期完成
 
-### M15.1 — GitHub Actions runtime / build-cache modernization（完成）
-- [x] 官方最新穩定版確認：`actions/checkout@v7.0.1`、`actions/setup-node@v7.0.0`、`actions/cache@v6.1.0`。
-- [x] 專案應用程式 runtime 保持 Node.js 22；只升級 action 自身 runtime / implementation。
-- [x] 新增 `.next/cache` restore/save；key 綁定 OS、package-lock 與 JS/TS/CSS source hash，cache miss 可安全重建。
-- [x] 保留 `npm ci`、`npm audit --audit-level=high`、`npm run build`。
-- [x] workflow 維持 `contents: read`，只使用 GitHub 官方 actions。
-- [x] GitHub Actions run `34725249161` 全綠。
+### M15 — CI modernization（完成）
+- [x] M15.1 升級官方 actions：`checkout@v7.0.1`、`setup-node@v7.0.0`、`cache@v6.1.0`；專案 runtime 仍為 Node 22。CI `34725249161`。
+- [x] 新增 `.next/cache`；後續 run log 明確 `Cache hit for: Linux-nextjs-...`，production compile 約由 5.3s 降至 113ms。
+- [x] push / PR CI 保留 `npm ci` + `npm audit --audit-level=high` + `npm run build`，workflow 僅 `contents: read`。
+- [x] M15.2 新增每週一 00:15 UTC（台灣約 08:15）read-only dependency audit；不自動修改依賴、不 push main。首次 audit run `34725323604` 全綠。
+- [x] 新 audit workflow commit 的正常 CI `34725323559` 也全綠。
 
 ### M14 — Dependency / CI security（完成）
 - [x] Next.js `16.2.1` → `16.3.5`；`fast-xml-parser` `5.5.9` → `5.11.1`，由 npm 在 GitHub runner 正式重建 lockfile。
-- [x] 升級後 production build 成功，Next.js 16.3.5 / TypeScript / static generation 全部通過。One-shot updater run `34725091999`。
 - [x] `npm audit` 從 8 個漏洞（1 critical / 4 high / 2 moderate / 1 low）降為 2 個（0 critical / 0 high / 1 moderate / 1 low）。
-- [x] 一次性 dependency updater 已從 repo 移除。
-- [x] CI 新增 `npm audit --audit-level=high`，未來 high / critical 會阻擋 main；最終 CI `34725159970` 全綠。
+- [x] CI 新增 `npm audit --audit-level=high`；最終 CI `34725159970` 全綠。
 
 ### M13 — Search V2（完成）
-- [x] M13.1 共用 matcher：name / ID / road / roadNumber / county / district / mile / direction / tags；支援 NFKC、臺/台、多 token、`38K` / `38.2K` / `38+200`。CI `34724600973`。
-- [x] CameraList 與首頁共用同一 matcher；Map 直接使用首頁已篩好的 Camera，避免舊規則二次過濾。
-- [x] M13.2 分類建議：道路／地區／監視器，去重與 score 排序，手機 max 50dvh，ArrowUp/Down、Enter、Escape。CI `34724916576`。
-- [x] M13.3 搜尋選取／ARIA polish：桌面與手機 listbox ID 唯一、Enter 可直接選第一項；既有 `q/road/camera` URL state 與 snapshot-first detail workflow 沿用。CI `34724980764`。
+- [x] M13.1 共用 matcher：name / ID / road / roadNumber / county / district / mile / direction / tags。CI `34724600973`。
+- [x] M13.2 分類建議：道路／地區／監視器；鍵盤操作與行動版高度限制。CI `34724916576`。
+- [x] M13.3 URL / ARIA polish。CI `34724980764`。
 
 ---
 
@@ -66,7 +60,8 @@
 - [x] **M12 Route / Trip Mode** — 完成。
 - [x] **M13 Search V2** — 完成。
 - [x] **M14 Dependency / CI security** — 完成。
-- [ ] **M15 CI modernization** — 進行中。
+- [x] **M15 CI modernization** — 完成。
+- [ ] **M16 Security regression / attack surface** — 進行中。
 
 ---
 
