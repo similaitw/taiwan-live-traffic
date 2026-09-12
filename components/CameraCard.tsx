@@ -18,9 +18,11 @@ const TYPE_STYLES: Record<Camera['type'], { bg: string; text: string; glow: stri
 interface Props {
   camera: Camera;
   onClick: (c: Camera) => void;
+  favorite?: boolean;
+  onToggleFavorite?: (c: Camera) => void;
 }
 
-export default function CameraCard({ camera, onClick }: Props) {
+export default function CameraCard({ camera, onClick, favorite = false, onToggleFavorite }: Props) {
   const [imgError, setImgError] = useState(false);
   const [imgLoading, setImgLoading] = useState(true);
   const [hovered, setHovered] = useState(false);
@@ -44,18 +46,34 @@ export default function CameraCard({ camera, onClick }: Props) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Thumbnail */}
       <div className="relative aspect-video overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
-        {/* Snapshot badge */}
         <span className="absolute right-2 top-2 z-10 px-2 py-0.5 rounded-full font-mono"
           style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(0,0,0,0.7)', color: typeStyle.text, border: `1px solid ${typeStyle.text}33` }}>
           快照
         </span>
 
-        {/* Live indicator dot */}
-        <span className="absolute left-2 top-2 z-10 flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
-        </span>
+        {onToggleFavorite && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleFavorite(camera);
+            }}
+            aria-label={favorite ? `取消收藏 ${camera.name}` : `收藏 ${camera.name}`}
+            title={favorite ? '取消收藏' : '加入收藏'}
+            className="absolute left-2 top-2 z-30 w-8 h-8 rounded-full flex items-center justify-center transition-all"
+            style={{
+              background: favorite ? 'rgba(245,158,11,0.92)' : 'rgba(0,0,0,0.68)',
+              color: favorite ? '#fff' : 'rgba(255,255,255,0.82)',
+              border: `1px solid ${favorite ? 'rgba(245,158,11,0.95)' : 'rgba(255,255,255,0.12)'}`,
+              boxShadow: favorite ? '0 0 14px rgba(245,158,11,0.35)' : 'none',
+            }}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill={favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+            </svg>
+          </button>
+        )}
 
         {proxyUrl && !imgError ? (
           <>
@@ -88,21 +106,18 @@ export default function CameraCard({ camera, onClick }: Props) {
           </div>
         )}
 
-        {/* Hover overlay */}
-        <div className="absolute inset-0 flex items-center justify-center transition-all duration-300"
+        <div className="absolute inset-0 flex items-center justify-center transition-all duration-300 pointer-events-none"
           style={{ background: hovered ? 'rgba(0,0,0,0.35)' : 'transparent', opacity: hovered ? 1 : 0 }}>
           <span className="px-3 py-1.5 rounded-full text-[11px] font-bold tracking-wide glass"
             style={{ color: 'var(--text-primary)' }}>
-            點擊播放
+            點擊查看
           </span>
         </div>
 
-        {/* Bottom gradient */}
         <div className="absolute bottom-0 left-0 right-0 h-12 pointer-events-none"
           style={{ background: 'linear-gradient(transparent, var(--bg-card))' }} />
       </div>
 
-      {/* Info */}
       <div className="p-3">
         <div className="flex items-start gap-2">
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
