@@ -6,25 +6,38 @@
 
 ## Current task
 
-### M2.3 — Camera Bottom Sheet
+### M3.1 — Marker clustering
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 手機點擊 Camera marker 或清單項目時，先開啟 Bottom Sheet，而不是立即開大型直播 modal。
-- [ ] Bottom Sheet 顯示：名稱、類型、快照、道路／方向／公里數、基本狀態與「開啟直播」按鈕。
-- [ ] Bottom Sheet 必須可關閉，且不應阻擋整張地圖操作。
-- [ ] 預設只載 snapshot；只有按「開啟直播」才沿用既有 `CameraModal` / MJPEG 流程。
-- [ ] 桌面版維持既有詳細 modal 行為，不強制改成 Bottom Sheet。
-- [ ] 不在本任務實作收藏、分享、上一支／下一支；這些留給 M4/M5。
+- [ ] 移除目前依地圖中心距離只顯示 50 / 100 / 200 支 Camera 的截斷策略。
+- [ ] 低縮放層級將鄰近 Camera 聚合成 cluster marker，顯示數量。
+- [ ] 點 cluster 後自動放大到該區域，逐步展開 Camera。
+- [ ] 放大後顯示單支 Camera marker，維持既有點擊／快照預覽行為。
+- [ ] 不新增重型 clustering dependency；優先使用 Leaflet 現有投影能力實作輕量 clustering。
+- [ ] 本任務先不做 viewport optimization；留給 M3.2。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M3.1 — Marker clustering。
+完成後將 Current task 更新成 M3.2 — Viewport optimization。
 
 ---
 
 ## 已完成任務
+
+### M2.3 — Camera Bottom Sheet（已完成）
+
+**Executor: ChatGPT**
+
+- [x] 手機 Camera marker / 清單點擊改為 Bottom Sheet，不直接開大型直播 modal。
+- [x] Bottom Sheet 顯示名稱、類型、快照、道路／方向／公里數與快照可用狀態。
+- [x] Bottom Sheet 不使用全螢幕 backdrop，地圖上方區域仍可操作。
+- [x] 預設只載 snapshot；只有按「開啟直播」才啟動既有 `CameraModal` / MJPEG。
+- [x] 桌面版維持原本 CameraModal 行為。
+- [x] GitHub Actions run `34703560223`：Install dependencies 與 Build 均成功。
+
+---
 
 ### M2.2 — Desktop sidebar layout（已完成）
 
@@ -106,11 +119,11 @@
 
 - [x] M2.1 Mobile map-first layout — **ChatGPT**
 - [x] M2.2 Desktop sidebar layout — **ChatGPT**
-- [ ] M2.3 Camera Bottom Sheet — **ChatGPT**
+- [x] M2.3 Camera Bottom Sheet — **ChatGPT**
 
 ### M3 — 地圖效能
 
-- [ ] M3.1 Marker clustering
+- [ ] M3.1 Marker clustering — **ChatGPT**
 - [ ] M3.2 Viewport optimization
 
 ### M4 — 使用者功能
