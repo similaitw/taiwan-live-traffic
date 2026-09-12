@@ -6,26 +6,35 @@
 
 ## Current task
 
-### M11.2 — Source freshness / health visibility
+### M11.3 — Live stream bandwidth / lifecycle guardrails
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 建立前端共用 source-health model，至少涵蓋 TDX events / flow / CMS 與 CWA rainfall。
-- [ ] 保留 API 回傳的 status / fetchedAt / dataCollectTime / observedAt，不只用 `enabled` 判斷顯示與否。
-- [ ] 圖層面板顯示資料來源健康狀態：正常、未設定、暫時失敗、資料時間。
-- [ ] 來源 unavailable 時圖層可以不可用，但需讓使用者知道原因，不再只是控制項消失。
-- [ ] stale 判定使用保守門檻，且只標示「資料可能較舊」，不把延遲誤判為服務故障。
-- [ ] Camera 主資料仍維持既有載入／錯誤顯示；本任務不重寫 `/api/cameras` response shape。
-- [ ] 不暴露 TDX credentials、上游內部錯誤堆疊或敏感資訊。
+- [ ] 確認 MJPEG live 只在使用者主動按「開啟直播」後才建立，不得因卡片／地圖 hover 或 snapshot 預覽自動啟動。
+- [ ] Camera modal 關閉、切換 Camera、頁面離開或元件 unmount 時，應立即讓 live `<img>` / request 生命周期結束，不保留背景串流。
+- [ ] live 顯示提供明確「停止直播」控制；停止後回到 snapshot，不需關閉 Camera 詳細資訊。
+- [ ] 避免同一 Camera 同時建立多個 live proxy request；手機 Bottom Sheet 與桌面 modal 不得重複啟動直播。
+- [ ] `/api/proxy/image` 保持 no-cache、allowlist 與 redirect revalidation；本任務不擴大 upstream hostname。
+- [ ] snapshot 卡片／Bottom Sheet 繼續走 `/api/proxy/snapshot`，不得退回 MJPEG relay。
+- [ ] 如可行，對 live relay 增加合理 server-side timeout／abort guardrail，避免異常 upstream 永久佔用 function。
 - [ ] GitHub Actions CI build 通過。
 
-完成後將 Current task 更新成 M11.3 — Live stream bandwidth / lifecycle guardrails。
+完成後將 Current task 更新成 M11.4 — Production diagnostics / deploy checklist。
 
 ---
 
 ## 已完成任務
+
+### M11.2 — Source freshness / health visibility（已完成）
+- [x] 前端共用 source-health model 涵蓋 TDX events / flow / CMS 與 CWA rainfall。
+- [x] 保留 API status / fetchedAt / dataCollectTime / observedAt，不只依賴 `enabled`。
+- [x] 圖層面板顯示載入中、正常、部分資料、未啟用、暫時失敗、資料較舊與來源時間。
+- [x] unavailable 圖層保留灰色控制項並顯示原因，不再直接消失。
+- [x] rainfall / flow / CMS 使用保守 stale 門檻，只標示資料較舊，不等同服務故障。
+- [x] 不顯示 TDX credentials、上游 stack 或原始敏感錯誤內容。
+- [x] GitHub Actions run `34709736577` 成功。
 
 ### M11.1 — Camera proxy redirect / SSRF hardening（已完成）
 - [x] image / snapshot proxy 共用單一 hostname allowlist 與 URL parser。
@@ -118,8 +127,9 @@
 
 ### M11 — Production hardening
 - [x] M11.1 Camera proxy redirect / SSRF hardening
-- [ ] M11.2 Source freshness / health visibility — **ChatGPT**
-- [ ] M11.3 Live stream bandwidth / lifecycle guardrails
+- [x] M11.2 Source freshness / health visibility
+- [ ] M11.3 Live stream bandwidth / lifecycle guardrails — **ChatGPT**
+- [ ] M11.4 Production diagnostics / deploy checklist
 
 ---
 
