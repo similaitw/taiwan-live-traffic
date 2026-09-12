@@ -9,7 +9,8 @@ import type { TrafficEvent, TrafficEventsResponse } from '@/types/traffic-event'
 import type { TrafficFlowMapSegment, TrafficFlowResponse } from '@/types/traffic-flow';
 import type { TrafficSectionsResponse } from '@/types/traffic-section';
 import { getDistance } from '@/lib/geo';
-import { getCameraRoadNumber, normalizeRoadNumber } from '@/lib/roads';
+import { getCameraRoadNumber, groupCamerasByRoad, normalizeRoadNumber } from '@/lib/roads';
+import { buildRouteCorridor } from '@/lib/route-corridor';
 import MapLayerControls, {
   type CmsLayerFilter,
   type EventLayerFilter,
@@ -18,6 +19,7 @@ import MapLayerControls, {
   type LayerHealthStatus,
   type RainfallLayerFilter,
 } from '@/components/MapLayerControls';
+import TripModeSummary from '@/components/TripModeSummary';
 
 const MapInner = dynamic(() => import('./MapInner'), { ssr: false });
 const RADAR_IMAGE_URL = 'https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-006.png';
@@ -387,6 +389,34 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
     return rainfallStations.filter((station) => (station.rainfall.past1Hr ?? 0) > 0);
   }, [rainfallFilter, rainfallStations]);
 
+  const corridorRoad = useMemo(() => {
+    const groups = groupCamerasByRoad(cameras);
+    return groups.length === 1 ? groups[0]?.roadNumber : undefined;
+  }, [cameras]);
+
+  const routeCorridor = useMemo(() => {
+    if (!corridorRoad) return null;
+    return buildRouteCorridor({
+      roadNumber: corridorRoad,
+      cameras,
+      trafficFlowSegments: flowEnabled ? congestionSegments : undefined,
+      trafficEvents: trafficEnabled ? trafficEvents : undefined,
+      cmsDevices: cmsEnabled ? cmsDevices : undefined,
+      rainfallStations: rainfallEnabled ? rainfallStations : undefined,
+    });
+  }, [
+    cameras,
+    cmsDevices,
+    cmsEnabled,
+    congestionSegments,
+    corridorRoad,
+    flowEnabled,
+    rainfallEnabled,
+    rainfallStations,
+    trafficEnabled,
+    trafficEvents,
+  ]);
+
   const radarImageUrl = showRadar
     ? `${RADAR_IMAGE_URL}?v=${radarVersion}`
     : undefined;
@@ -411,6 +441,8 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
         rainfallStations={showRainfall ? filteredRainfallStations : []}
         radarImageUrl={radarImageUrl}
       />
+
+      {routeCorridor && <TripModeSummary corridor={routeCorridor} />}
 
       <MapLayerControls
         rainfallEnabled={rainfallEnabled}
