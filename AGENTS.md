@@ -1,19 +1,28 @@
 # AGENTS.md
 
-本專案以 GitHub `main` 為唯一狀態來源。目標是讓 Codex 以最少上下文完成小型、可驗收的增量任務。
+本專案以 GitHub `main` 為唯一狀態來源。目標是用最少模型額度完成小型、可驗收的增量任務。
 
-## 每次工作固定流程
+## Executor 路由規則
+
+- **預設 Executor = ChatGPT。** 能由 ChatGPT 透過 GitHub 直接完成、檢查與更新的工作，不交給 Codex。
+- 只有 `docs/TASKS.md` 明確標示 `Executor: Codex` 的任務，才使用 Codex。
+- 適合 Codex 的情況：大型跨檔重構、複雜除錯、需要長時間 agent 探索、或 ChatGPT 無法可靠完成／驗證的本機工作。
+- 單純文件、型別、hooks、小型 API/UI 修改、任務拆分、review、GitHub 狀態更新，原則上由 ChatGPT 完成。
+- Build / test 優先交由 GitHub Actions 自動驗證，不為了單純跑 build 消耗 Codex 額度。
+- 若 Codex 被啟動但 Current task 沒有標示 `Executor: Codex`，不要執行任務；只回報應先交由 ChatGPT 處理。
+
+## Codex 每次工作固定流程
 
 1. 先讀 `AGENTS.md`。
 2. 再讀 `docs/TASKS.md`。
-3. 只執行 `Current task`。
-4. 先檢查該任務直接相關的程式檔，不要掃描整個 repository。
-5. **只有任務內容不足以判斷產品／架構要求時，才讀 `docs/V2_SPEC.md` 的相關章節；不要預設整份讀取。**
-6. 只修改完成 Current task 必要的檔案，不順手做下一個 milestone。
-7. 執行 `npm run build`；若已有相關測試，也要執行。
-8. 測試通過後更新 `docs/TASKS.md`：勾選完成項目，將 `Current task` 移到下一個未完成子任務。
-9. commit 並 push 到 `main`。
-10. 回報：完成內容、測試／build 結果、commit SHA、下一個 Current task。
+3. 確認 Current task 明確標示 `Executor: Codex`；否則停止。
+4. 只執行 `Current task`。
+5. 先檢查該任務直接相關的程式檔，不要掃描整個 repository。
+6. **只有任務內容不足以判斷產品／架構要求時，才讀 `docs/V2_SPEC.md` 的相關章節；不要預設整份讀取。**
+7. 只修改完成 Current task 必要的檔案，不順手做下一個 milestone。
+8. 執行必要測試；GitHub Actions 已負責一般 `npm run build` 驗證時，不重複做無必要工作。
+9. 完成後更新 `docs/TASKS.md`，commit 並 push 到 `main`。
+10. 回報：完成內容、測試結果、commit SHA、下一個 Current task。
 
 ## Token / 額度節省規則
 
@@ -37,8 +46,9 @@
 
 ## Source of truth
 
-- 執行狀態與下一步：`docs/TASKS.md`
+- 執行狀態、Executor 與下一步：`docs/TASKS.md`
 - V2 完整產品／架構規格：`docs/V2_SPEC.md`
 - 實際程式狀態：`main`
+- 自動 build 驗證：`.github/workflows/ci.yml`
 
 若三者有衝突：實際程式狀態優先判斷相容性，任務範圍以 `docs/TASKS.md` 為準，產品方向以 `docs/V2_SPEC.md` 為準。
