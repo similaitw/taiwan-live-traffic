@@ -8,41 +8,43 @@
 
 ## Current task
 
-### M20.1 — Direction-aware road mode foundation
+### M20.2 — Direction filter UI / URL state / Trip Mode integration
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 建立共用道路方向 normalization，統一 `北向/北上/往北/N/NB/northbound` 等別名，南／東／西同理。
-- [ ] 建立方向 label / option 聚合 utility，可由某道路 Camera 產生方向選項與數量。
-- [ ] `route-corridor` 改用共用方向 matcher，移除自己的第二套 normalization。
-- [ ] 對沒有方向 metadata 的事件／設備維持保守納入，不因選方向而錯誤丟掉可能影響全線的資料。
-- [ ] 不改首頁 UI、不改 URL state；留給 M20.2。
-- [ ] 補 direction regression tests；`npm audit`、全部 tests、production build 全部通過。
+- [ ] 選定道路後顯示方向 filter，選項來自該道路 Camera 的 canonical direction 與數量。
+- [ ] URL 支援 `direction=north|south|east|west`；重開分享網址可恢復道路 + 方向 context。
+- [ ] 換道路、取消道路、或 URL direction 不存在於該道路時，自動清除方向，避免空白狀態。
+- [ ] direction 套用到首頁 Camera 清單與地圖 Camera，沒有 direction metadata 的 Camera 保守保留。
+- [ ] `Map` 將同一 direction 傳入 `buildRouteCorridor()`，讓 TDX flow / event / CMS 與 Trip Mode 摘要一致。
+- [ ] Trip Mode 顯示中文方向 label，但分享網址保留 canonical `direction=`。
+- [ ] 桌面與手機都可操作；不破壞搜尋／收藏／附近／道路 filter。
+- [ ] `npm audit`、全部 tests、production build 全部通過。
 
-完成後進入 M20.2 — Direction filter UI / URL state / Trip Mode integration。
+完成後 M20 Direction-aware road mode 結案。
 
 ---
 
 ## 近期完成
 
+### M20.1 — Direction-aware road mode foundation（完成）
+- [x] 新增共用 direction normalization，統一北向/北上/往北/N/NB/northbound 等別名，南／東／西同理。
+- [x] 新增 canonical direction label / option aggregation，方向順序固定北、南、東、西。
+- [x] `route-corridor` 改用共用 matcher，移除自己的第二套 normalization。
+- [x] direction filter 對缺少方向 metadata 的事件／設備預設保守納入。
+- [x] direction regression tests 已納入正常測試；CI `34730950896`：0-vulnerability audit、tests、production build 全綠。
+
 ### M19 — Passive Camera status（完成）
-- [x] M19.1：snapshot success / failure 建立 `unknown / online / stale / offline` 被動 observation；2 分鐘無新 frame 轉 stale。CI `34730601848`。
-- [x] CameraCard 只重用既有 snapshot `onLoad/onError`，不增加背景 probe；中性顯示「快照可用／待更新／暫不可用」。
-- [x] M19.2：新增 browser-session shared registry + `useSyncExternalStore`；Card、Bottom Sheet、Modal 共用 `status / lastCheckedAt / lastFrameAt`。
-- [x] Bottom Sheet / Modal 自己原本就會載入的 snapshot 也會回寫 registry；不新增 CCTV request、不寫 localStorage。
-- [x] Modal 只有實際 live stream `<img onLoad>` 成功才顯示 LIVE；snapshot 狀態不冒充直播。
-- [x] shared-registry regression tests 已納入正常測試；CI `34730778322`：0-vulnerability audit、tests、production build 全綠。
+- [x] M19.1：Card 以既有 snapshot 成敗建立 `unknown / online / stale / offline` observation。CI `34730601848`。
+- [x] M19.2：session shared registry；Card、Bottom Sheet、Modal 共用狀態；真正 live `onLoad` 才顯示 LIVE。CI `34730778322`。
 
 ### M18 — Dependency cleanup（完成）
 - [x] 非 breaking `npm audit fix` 後為 **0 vulnerabilities**；最終正常 CI `34730410486` 全綠。
 
 ### M17 — Proxy resource controls（完成）
 - [x] snapshot proxy：64-entry / 30s TTL cache、2 MiB payload cap、8s full capture timeout；CI `34730322887` 全綠。
-
-### M16 — Security regression / attack surface（完成）
-- [x] 移除 `/api/test-source` 任意 server fetch；Camera proxy allowlist / redirect tests 納入 CI。
 
 ---
 
@@ -67,7 +69,7 @@
 - [x] **M17 Proxy resource controls**。
 - [x] **M18 Dependency cleanup** — 0 npm vulnerabilities。
 - [x] **M19 Passive Camera status**。
-- [ ] **M20 Direction-aware road mode** — M20.1 進行中。
+- [ ] **M20 Direction-aware road mode** — M20.1 完成，M20.2 進行中。
 
 ---
 
