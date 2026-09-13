@@ -8,46 +8,43 @@
 
 ## Current task
 
-### M19.1 — Passive Camera snapshot status foundation
+### M19.2 — Share passive status with Bottom Sheet / detail surfaces
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 不新增背景 probe；只重用使用者原本就會載入的 snapshot 成功／失敗事件。
-- [ ] 建立共用 Camera status observation utility，沿用既有 `online / stale / offline / unknown` 型別。
-- [ ] snapshot 成功記錄 `online + lastCheckedAt + lastFrameAt`；失敗記錄 `lastCheckedAt`，有既有 frame 時標示 `stale`，無既有 frame 時標示 `offline`。
-- [ ] 已成功但長時間沒有新 frame 的狀態可轉為 `stale`，避免永遠顯示 online。
-- [ ] CameraCard 顯示中性、非假 LIVE 的被動快照狀態；錯誤文案不得把單次失敗誇大為永久離線。
-- [ ] 不改 `/api/cameras` response shape、不增加 CCTV upstream 請求、不自動啟動 live stream。
-- [ ] 補純函式 regression tests；`npm audit`、security tests、`npm run build` 全部通過。
+- [ ] 將 M19.1 的被動 Camera observation 提升為 browser session 內共用 registry；不引入 Redux / Zustand / localStorage。
+- [ ] CameraCard、手機 Bottom Sheet、桌面 CameraModal 讀寫同一支 Camera 的 `status / lastCheckedAt / lastFrameAt`。
+- [ ] 各 surface 自己原本就會載入的 snapshot `onLoad/onError` 可更新同一份 observation；不新增背景 probe。
+- [ ] Bottom Sheet / Modal 顯示中性被動狀態；live stream 成功時仍只有 CameraModal 的實際 stream `onLoad` 才可顯示 LIVE。
+- [ ] stale freshness timer 沿用 M19.1 規則，不新增額外 CCTV request。
+- [ ] 不改 `/api/cameras` response shape、不持久化個別 Camera health 到跨 session storage。
+- [ ] 補 shared-registry regression tests；`npm audit`、全部 tests、`npm run build` 全部通過。
 
-完成後進入 M19.2 — Share passive status with Bottom Sheet / detail surfaces。
+完成後 M19 Passive Camera status 結案，再評估下一個產品功能。
 
 ---
 
 ## 近期完成
 
+### M19.1 — Passive Camera snapshot status foundation（完成）
+- [x] 新增共用 `camera-status` observation：`unknown / online / stale / offline`，沿用既有 Camera V2 型別。
+- [x] snapshot success → `online + lastCheckedAt + lastFrameAt`；failure 有舊 frame → `stale`，無舊 frame → `offline`。
+- [x] online observation 超過 2 分鐘沒有新 frame 會轉 stale，避免永久假 online。
+- [x] CameraCard 以既有 snapshot `onLoad/onError` 被動更新狀態；無任何額外 probe / live request。
+- [x] UI 使用「快照可用／快照待更新／快照暫不可用」等中性文案，不以單次失敗宣稱永久離線。
+- [x] 新增 Camera status transition regression tests；CI `34730601848`：0-vulnerability audit、tests、production build 全綠。
+
 ### M18 — Dependency cleanup（完成）
-- [x] 使用非 breaking `npm audit fix` 更新 transitive dependencies，未使用 `--force`、未手工改 lockfile integrity。
-- [x] `npm audit`：2 個（1 moderate / 1 low）→ **0 vulnerabilities**。
-- [x] one-shot run `34730371657`：13/13 security/resource tests 通過、production build 成功。
-- [x] bot commit `b6972c9` 套用 lockfile fixes；一次性 write-permission workflow 已移除。
-- [x] 最終正常 read-only CI `34730410486`：audit、tests、build 全綠。
+- [x] 非 breaking `npm audit fix` 後為 **0 vulnerabilities**；13/13 security/resource tests 與 build 成功。
+- [x] 一次性 write workflow 已移除；最終正常 read-only CI `34730410486` 全綠。
 
 ### M17.1 — Snapshot proxy memory / payload bounds（完成）
-- [x] `/api/proxy/snapshot` 改為 64-entry bounded cache、30 秒 TTL；滿載淘汰最舊 entry。
-- [x] 非 multipart 與 multipart frame 都有 2 MiB 上限；8 秒 timeout 涵蓋完整 frame capture。
-- [x] 新增 snapshot resource regression tests；CI `34730322887` 全綠。
-- [x] serverless per-instance rate-limit 暫不實作，避免產生全域防護的錯誤安全感。
+- [x] snapshot proxy：64-entry / 30s TTL cache、2 MiB payload cap、8s full capture timeout；CI `34730322887` 全綠。
 
 ### M16 — Security regression / attack surface（完成）
-- [x] 移除任意 server-side fetch 的 `/api/test-source`；production route list 已移除該端點。CI `34725405017`。
-- [x] Camera proxy allowlist / redirect regression tests 納入正常 CI；最終 CI `34730221902` 全綠。
-
-### M15 — CI modernization（完成）
-- [x] 官方 actions 更新至 checkout 7.0.1 / setup-node 7.0.0 / cache 6.1.0；Node 22。
-- [x] `.next/cache` 已確認真實 cache hit；每週 read-only dependency audit 已啟用。
+- [x] 移除 `/api/test-source` 任意 server fetch；Camera proxy allowlist / redirect tests 納入 CI。
 
 ---
 
@@ -71,7 +68,7 @@
 - [x] **M16 Security regression / attack surface**。
 - [x] **M17 Proxy resource controls**。
 - [x] **M18 Dependency cleanup** — 0 npm vulnerabilities。
-- [ ] **M19 Passive Camera status** — 進行中。
+- [ ] **M19 Passive Camera status** — M19.1 完成，M19.2 進行中。
 
 ---
 
