@@ -135,6 +135,9 @@ export default function CameraModal({ camera, onClose }: Props) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="camera-modal-title"
         className="overflow-hidden w-full max-w-3xl transition-all duration-300"
         style={{
           background: 'var(--bg-card)',
@@ -151,7 +154,7 @@ export default function CameraModal({ camera, onClose }: Props) {
             <span className="text-[10px] font-bold px-2 py-0.5 rounded shrink-0" style={{ background: typeStyle.bg, color: typeStyle.text }}>
               {TYPE_LABEL[camera.type]}
             </span>
-            <h2 className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{camera.name}</h2>
+            <h2 id="camera-modal-title" className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{camera.name}</h2>
             <span
               className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full"
               style={{ background: status.bg, border: `1px solid ${status.color}55` }}
