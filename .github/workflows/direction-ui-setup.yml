@@ -105,7 +105,11 @@ jobs:
               page,
               '                query=""\n                onSelect=',
               '                query=""\n                direction={selectedDirection ?? undefined}\n                onSelect=',
-              expected=2,
+          )
+          replace_exact(
+              page,
+              '                  query=""\n                  onSelect=',
+              '                  query=""\n                  direction={selectedDirection ?? undefined}\n                  onSelect=',
           )
 
           map_file = 'components/Map.tsx'
