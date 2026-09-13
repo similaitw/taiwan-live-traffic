@@ -8,40 +8,46 @@
 
 ## Current task
 
-### M21.1 — Accessibility / reduced-motion audit
+### M21.2 — Modal focus workflow polish
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 依 `docs/V2_SPEC.md` §18 稽核主要互動元件：icon button `aria-label`、Modal / Bottom Sheet Escape 關閉、focus 可見性。
-- [ ] 補上全站 `prefers-reduced-motion` fallback，降低非必要 animation / transition，不影響地圖核心操作。
-- [ ] 狀態資訊不得只靠顏色；若現有 Camera status / source health 有純顏色表達，補文字或可讀 label。
-- [ ] 優先小幅修補，不做 UI 大重構，不新增 accessibility 套件。
+- [ ] CameraModal 開啟時保存先前 focus，將 focus 移入 dialog。
+- [ ] Modal 開啟期間 Tab / Shift+Tab 不可跑出 `aria-modal` dialog。
+- [ ] Escape / backdrop / 關閉按鈕沿用同一 `onClose` workflow。
+- [ ] Modal 關閉或切換離開後，盡量將 focus 還原到原操作元素；元素已不存在時安全略過。
+- [ ] 手機 Bottom Sheet 維持非 modal，不阻斷地圖互動，不做 focus trap。
+- [ ] 不新增 accessibility 套件，不改 Snapshot / Live lifecycle。
 - [ ] `npm audit`、全部 tests、production build 全部通過。
 
-完成後再評估 M21.2 — Detail / focus workflow polish。
+完成後 M21 Accessibility / interaction hardening 結案。
 
 ---
 
 ## 近期完成
+
+### M21.1 — Accessibility / reduced-motion audit（完成）
+- [x] Modal、Bottom Sheet、Search suggestions、Map layer panel 皆已支援 Escape 關閉；主要 icon-only buttons 已有 `aria-label`。
+- [x] Camera status / source health 同時提供文字狀態，不依賴顏色單獨傳達資訊。
+- [x] 全站新增 `:focus-visible` 明確 outline。
+- [x] 全站新增 `prefers-reduced-motion: reduce`，壓低非必要 animation / transition。
+- [x] CameraModal 補 `role="dialog"`、`aria-modal="true"`、`aria-labelledby` 與標題 ID。
+- [x] one-shot setup 已移除；最終正常 CI `34732812658` 全綠。
 
 ### M20 — Direction-aware road mode（完成）
 - [x] M20.1：共用 direction normalization；北向/北上/NB/northbound 等統一 canonical direction；route-corridor 共用 matcher。CI `34730950896`。
 - [x] M20.2：選道路後顯示方向 filter；URL 支援 `direction=north|south|east|west`，換路或無效方向自動清除。
 - [x] Camera 清單／地圖套用同一 direction；缺少 direction metadata 的 Camera 保守保留。
 - [x] Map 將 canonical direction 傳入 `buildRouteCorridor()`，Trip Mode 顯示中文方向但分享網址保留 canonical value。
-- [x] Desktop / mobile 皆可操作；one-shot integration 成功後已移除，最終正常 CI `34732610626` 全綠。
+- [x] Desktop / mobile 皆可操作；最終正常 CI `34732610626` 全綠。
 
 ### M19 — Passive Camera status（完成）
-- [x] M19.1：Card 以既有 snapshot 成敗建立 `unknown / online / stale / offline` observation。CI `34730601848`。
-- [x] M19.2：session shared registry；Card、Bottom Sheet、Modal 共用狀態；真正 live `onLoad` 才顯示 LIVE。CI `34730778322`。
+- [x] Card 以實際 snapshot 成敗建立 passive status；Card / Bottom Sheet / Modal 共用 session registry；真正 live `onLoad` 才顯示 LIVE。
 
 ### M18 — Dependency cleanup（完成）
-- [x] 非 breaking `npm audit fix` 後為 **0 vulnerabilities**；最終正常 CI `34730410486` 全綠。
-
-### M17 — Proxy resource controls（完成）
-- [x] snapshot proxy：64-entry / 30s TTL cache、2 MiB payload cap、8s full capture timeout；CI `34730322887` 全綠。
+- [x] 非 breaking `npm audit fix` 後為 **0 vulnerabilities**。
 
 ---
 
@@ -67,7 +73,7 @@
 - [x] **M18 Dependency cleanup** — 0 npm vulnerabilities。
 - [x] **M19 Passive Camera status**。
 - [x] **M20 Direction-aware road mode**。
-- [ ] **M21 Accessibility / interaction hardening** — M21.1 進行中。
+- [ ] **M21 Accessibility / interaction hardening** — M21.2 進行中。
 
 ---
 
