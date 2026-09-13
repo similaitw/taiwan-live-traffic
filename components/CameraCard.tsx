@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { Camera } from '@/types/camera';
+import type { Camera, CameraStatus } from '@/types/camera';
+import { usePassiveCameraStatus } from '@/hooks/usePassiveCameraStatus';
 
 const TYPE_LABEL: Record<Camera['type'], string> = {
   freeway: '國道',
@@ -15,6 +16,33 @@ const TYPE_STYLES: Record<Camera['type'], { bg: string; text: string; glow: stri
   county: { bg: 'rgba(245,158,11,0.15)', text: 'var(--accent-county)', glow: 'var(--glow-amber)' },
 };
 
+const STATUS_STYLES: Record<CameraStatus, { label: string; color: string; bg: string; border: string }> = {
+  online: {
+    label: '快照可用',
+    color: '#6ee7b7',
+    bg: 'rgba(6,78,59,0.78)',
+    border: 'rgba(110,231,183,0.28)',
+  },
+  stale: {
+    label: '快照待更新',
+    color: '#fcd34d',
+    bg: 'rgba(120,53,15,0.78)',
+    border: 'rgba(252,211,77,0.28)',
+  },
+  offline: {
+    label: '快照暫不可用',
+    color: '#fca5a5',
+    bg: 'rgba(127,29,29,0.78)',
+    border: 'rgba(252,165,165,0.28)',
+  },
+  unknown: {
+    label: '快照待確認',
+    color: '#cbd5e1',
+    bg: 'rgba(15,23,42,0.78)',
+    border: 'rgba(203,213,225,0.2)',
+  },
+};
+
 interface Props {
   camera: Camera;
   onClick: (c: Camera) => void;
@@ -26,12 +54,17 @@ export default function CameraCard({ camera, onClick, favorite = false, onToggle
   const [imgError, setImgError] = useState(false);
   const [imgLoading, setImgLoading] = useState(true);
   const [hovered, setHovered] = useState(false);
+  const { observation, markSnapshotSuccess, markSnapshotFailure } = usePassiveCameraStatus(camera);
   const previewSrc = camera.snapshotUrl || camera.streamUrl;
   const proxyUrl = previewSrc
     ? `/api/proxy/snapshot?url=${encodeURIComponent(previewSrc)}&t=${camera.id}`
     : null;
 
   const typeStyle = TYPE_STYLES[camera.type];
+  const statusStyle = STATUS_STYLES[observation.status];
+  const checkedAt = observation.lastCheckedAt
+    ? new Date(observation.lastCheckedAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
+    : undefined;
 
   return (
     <div
@@ -47,9 +80,19 @@ export default function CameraCard({ camera, onClick, favorite = false, onToggle
       onMouseLeave={() => setHovered(false)}
     >
       <div className="relative aspect-video overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
-        <span className="absolute right-2 top-2 z-10 px-2 py-0.5 rounded-full font-mono"
-          style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(0,0,0,0.7)', color: typeStyle.text, border: `1px solid ${typeStyle.text}33` }}>
-          快照
+        <span
+          className="absolute right-2 top-2 z-10 px-2 py-0.5 rounded-full font-mono"
+          title={checkedAt ? `最後檢查 ${checkedAt}` : '尚未完成被動快照檢查'}
+          style={{
+            fontSize: '9px',
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+            background: statusStyle.bg,
+            color: statusStyle.color,
+            border: `1px solid ${statusStyle.border}`,
+          }}
+        >
+          {imgLoading && observation.status === 'unknown' ? '快照檢查中' : statusStyle.label}
         </span>
 
         {onToggleFavorite && (
@@ -92,8 +135,15 @@ export default function CameraCard({ camera, onClick, favorite = false, onToggle
               alt={camera.name}
               className="w-full h-full object-cover transition-transform duration-500"
               style={{ transform: hovered ? 'scale(1.08)' : 'scale(1)', opacity: imgLoading ? 0 : 1 }}
-              onLoad={() => setImgLoading(false)}
-              onError={() => { setImgLoading(false); setImgError(true); }}
+              onLoad={() => {
+                setImgLoading(false);
+                markSnapshotSuccess();
+              }}
+              onError={() => {
+                setImgLoading(false);
+                setImgError(true);
+                markSnapshotFailure();
+              }}
             />
           </>
         ) : (
