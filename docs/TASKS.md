@@ -8,39 +8,37 @@
 
 ## Current task
 
-### M19.2 — Share passive status with Bottom Sheet / detail surfaces
+### M20.1 — Direction-aware road mode foundation
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 將 M19.1 的被動 Camera observation 提升為 browser session 內共用 registry；不引入 Redux / Zustand / localStorage。
-- [ ] CameraCard、手機 Bottom Sheet、桌面 CameraModal 讀寫同一支 Camera 的 `status / lastCheckedAt / lastFrameAt`。
-- [ ] 各 surface 自己原本就會載入的 snapshot `onLoad/onError` 可更新同一份 observation；不新增背景 probe。
-- [ ] Bottom Sheet / Modal 顯示中性被動狀態；live stream 成功時仍只有 CameraModal 的實際 stream `onLoad` 才可顯示 LIVE。
-- [ ] stale freshness timer 沿用 M19.1 規則，不新增額外 CCTV request。
-- [ ] 不改 `/api/cameras` response shape、不持久化個別 Camera health 到跨 session storage。
-- [ ] 補 shared-registry regression tests；`npm audit`、全部 tests、`npm run build` 全部通過。
+- [ ] 建立共用道路方向 normalization，統一 `北向/北上/往北/N/NB/northbound` 等別名，南／東／西同理。
+- [ ] 建立方向 label / option 聚合 utility，可由某道路 Camera 產生方向選項與數量。
+- [ ] `route-corridor` 改用共用方向 matcher，移除自己的第二套 normalization。
+- [ ] 對沒有方向 metadata 的事件／設備維持保守納入，不因選方向而錯誤丟掉可能影響全線的資料。
+- [ ] 不改首頁 UI、不改 URL state；留給 M20.2。
+- [ ] 補 direction regression tests；`npm audit`、全部 tests、production build 全部通過。
 
-完成後 M19 Passive Camera status 結案，再評估下一個產品功能。
+完成後進入 M20.2 — Direction filter UI / URL state / Trip Mode integration。
 
 ---
 
 ## 近期完成
 
-### M19.1 — Passive Camera snapshot status foundation（完成）
-- [x] 新增共用 `camera-status` observation：`unknown / online / stale / offline`，沿用既有 Camera V2 型別。
-- [x] snapshot success → `online + lastCheckedAt + lastFrameAt`；failure 有舊 frame → `stale`，無舊 frame → `offline`。
-- [x] online observation 超過 2 分鐘沒有新 frame 會轉 stale，避免永久假 online。
-- [x] CameraCard 以既有 snapshot `onLoad/onError` 被動更新狀態；無任何額外 probe / live request。
-- [x] UI 使用「快照可用／快照待更新／快照暫不可用」等中性文案，不以單次失敗宣稱永久離線。
-- [x] 新增 Camera status transition regression tests；CI `34730601848`：0-vulnerability audit、tests、production build 全綠。
+### M19 — Passive Camera status（完成）
+- [x] M19.1：snapshot success / failure 建立 `unknown / online / stale / offline` 被動 observation；2 分鐘無新 frame 轉 stale。CI `34730601848`。
+- [x] CameraCard 只重用既有 snapshot `onLoad/onError`，不增加背景 probe；中性顯示「快照可用／待更新／暫不可用」。
+- [x] M19.2：新增 browser-session shared registry + `useSyncExternalStore`；Card、Bottom Sheet、Modal 共用 `status / lastCheckedAt / lastFrameAt`。
+- [x] Bottom Sheet / Modal 自己原本就會載入的 snapshot 也會回寫 registry；不新增 CCTV request、不寫 localStorage。
+- [x] Modal 只有實際 live stream `<img onLoad>` 成功才顯示 LIVE；snapshot 狀態不冒充直播。
+- [x] shared-registry regression tests 已納入正常測試；CI `34730778322`：0-vulnerability audit、tests、production build 全綠。
 
 ### M18 — Dependency cleanup（完成）
-- [x] 非 breaking `npm audit fix` 後為 **0 vulnerabilities**；13/13 security/resource tests 與 build 成功。
-- [x] 一次性 write workflow 已移除；最終正常 read-only CI `34730410486` 全綠。
+- [x] 非 breaking `npm audit fix` 後為 **0 vulnerabilities**；最終正常 CI `34730410486` 全綠。
 
-### M17.1 — Snapshot proxy memory / payload bounds（完成）
+### M17 — Proxy resource controls（完成）
 - [x] snapshot proxy：64-entry / 30s TTL cache、2 MiB payload cap、8s full capture timeout；CI `34730322887` 全綠。
 
 ### M16 — Security regression / attack surface（完成）
@@ -68,7 +66,8 @@
 - [x] **M16 Security regression / attack surface**。
 - [x] **M17 Proxy resource controls**。
 - [x] **M18 Dependency cleanup** — 0 npm vulnerabilities。
-- [ ] **M19 Passive Camera status** — M19.1 完成，M19.2 進行中。
+- [x] **M19 Passive Camera status**。
+- [ ] **M20 Direction-aware road mode** — M20.1 進行中。
 
 ---
 
