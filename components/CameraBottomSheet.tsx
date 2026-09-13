@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Camera } from '@/types/camera';
+import type { Camera, CameraStatus } from '@/types/camera';
 import type { RoadNeighbors } from '@/lib/roads';
+import { usePassiveCameraStatus } from '@/hooks/usePassiveCameraStatus';
 import CameraShareButton from './CameraShareButton';
 import RoadCameraNavigator from './RoadCameraNavigator';
 
@@ -16,6 +17,13 @@ const TYPE_STYLES: Record<Camera['type'], { bg: string; text: string }> = {
   freeway: { bg: 'rgba(59,130,246,0.15)', text: 'var(--accent-freeway)' },
   provincial: { bg: 'rgba(16,185,129,0.15)', text: 'var(--accent-provincial)' },
   county: { bg: 'rgba(245,158,11,0.15)', text: 'var(--accent-county)' },
+};
+
+const STATUS_PRESENTATION: Record<CameraStatus, { label: string; color: string }> = {
+  online: { label: '快照可用', color: 'var(--accent-provincial)' },
+  stale: { label: '快照待更新', color: '#f59e0b' },
+  offline: { label: '快照暫不可用', color: '#f87171' },
+  unknown: { label: '快照待確認', color: 'var(--text-muted)' },
 };
 
 interface Props {
@@ -38,6 +46,7 @@ export default function CameraBottomSheet({
   onNavigateRoad,
 }: Props) {
   const [snapshotState, setSnapshotState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const { observation, markSnapshotSuccess, markSnapshotFailure } = usePassiveCameraStatus(camera);
 
   useEffect(() => {
     setSnapshotState('loading');
@@ -58,18 +67,10 @@ export default function CameraBottomSheet({
     ? `/api/proxy/snapshot?url=${encodeURIComponent(previewSrc)}&t=${camera.id}`
     : null;
   const typeStyle = TYPE_STYLES[camera.type];
-
-  const statusText = snapshotState === 'ready'
-    ? '快照可用'
-    : snapshotState === 'error'
-      ? '來源異常'
-      : '確認中';
-
-  const statusColor = snapshotState === 'ready'
-    ? 'var(--accent-provincial)'
-    : snapshotState === 'error'
-      ? '#ef4444'
-      : 'var(--text-muted)';
+  const passiveStatus = STATUS_PRESENTATION[observation.status];
+  const checkedAt = observation.lastCheckedAt
+    ? new Date(observation.lastCheckedAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
+    : undefined;
 
   return (
     <section
@@ -98,9 +99,14 @@ export default function CameraBottomSheet({
               >
                 {TYPE_LABEL[camera.type]}
               </span>
-              <span className="text-[10px] font-bold flex items-center gap-1.5" style={{ color: statusColor }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
-                {statusText}
+              <span
+                className="text-[10px] font-bold flex items-center gap-1.5"
+                style={{ color: passiveStatus.color }}
+                title={checkedAt ? `最後檢查 ${checkedAt}` : '尚未完成被動快照檢查'}
+                aria-live="polite"
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: passiveStatus.color }} />
+                {snapshotState === 'loading' && observation.status === 'unknown' ? '快照確認中' : passiveStatus.label}
               </span>
             </div>
             <h2 className="text-sm font-bold line-clamp-2" style={{ color: 'var(--text-primary)' }}>
@@ -156,8 +162,14 @@ export default function CameraBottomSheet({
                   alt={camera.name}
                   className="w-full h-full object-cover"
                   style={{ opacity: snapshotState === 'ready' ? 1 : 0 }}
-                  onLoad={() => setSnapshotState('ready')}
-                  onError={() => setSnapshotState('error')}
+                  onLoad={() => {
+                    setSnapshotState('ready');
+                    markSnapshotSuccess();
+                  }}
+                  onError={() => {
+                    setSnapshotState('error');
+                    markSnapshotFailure();
+                  }}
                 />
                 {snapshotState === 'error' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-5 text-center">
@@ -191,6 +203,11 @@ export default function CameraBottomSheet({
           {camera.mile !== undefined && (
             <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               <span style={{ color: 'var(--text-muted)' }}>里程 </span>{camera.mile}K
+            </span>
+          )}
+          {checkedAt && (
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>快照檢查 </span>{checkedAt}
             </span>
           )}
         </div>
