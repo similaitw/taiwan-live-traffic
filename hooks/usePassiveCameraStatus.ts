@@ -5,6 +5,7 @@ import type { Camera } from '@/types/camera';
 import {
   CAMERA_STATUS_STALE_AFTER_MS,
   initialCameraStatusObservation,
+  type CameraStatusObservation,
 } from '@/lib/camera-status';
 import {
   getRegisteredCameraStatus,
@@ -14,50 +15,53 @@ import {
   subscribeCameraStatus,
 } from '@/lib/camera-status-registry';
 
-export function usePassiveCameraStatus(camera: Camera) {
+const UNKNOWN_OBSERVATION: CameraStatusObservation = { status: 'unknown' };
+
+export function usePassiveCameraStatus(camera: Camera | null) {
+  const cameraId = camera?.id ?? '';
   const fallback = useMemo(
-    () => initialCameraStatusObservation(camera),
-    [camera.id, camera.lastCheckedAt, camera.lastFrameAt, camera.status],
+    () => camera ? initialCameraStatusObservation(camera) : UNKNOWN_OBSERVATION,
+    [camera?.id, camera?.lastCheckedAt, camera?.lastFrameAt, camera?.status],
   );
 
   const subscribe = useCallback(
-    (listener: () => void) => subscribeCameraStatus(camera.id, listener),
-    [camera.id],
+    (listener: () => void) => cameraId ? subscribeCameraStatus(cameraId, listener) : () => {},
+    [cameraId],
   );
 
   const getSnapshot = useCallback(
-    () => getRegisteredCameraStatus(camera.id) ?? fallback,
-    [camera.id, fallback],
+    () => cameraId ? getRegisteredCameraStatus(cameraId) ?? fallback : fallback,
+    [cameraId, fallback],
   );
 
   const observation = useSyncExternalStore(subscribe, getSnapshot, () => fallback);
 
   useEffect(() => {
-    if (observation.status !== 'online' || !observation.lastFrameAt) return;
+    if (!cameraId || observation.status !== 'online' || !observation.lastFrameAt) return;
 
     const lastFrameTime = Date.parse(observation.lastFrameAt);
     if (!Number.isFinite(lastFrameTime)) return;
 
     const remaining = CAMERA_STATUS_STALE_AFTER_MS - (Date.now() - lastFrameTime);
     if (remaining <= 0) {
-      refreshCameraStatusFreshness(camera.id, fallback);
+      refreshCameraStatusFreshness(cameraId, fallback);
       return;
     }
 
     const timer = window.setTimeout(() => {
-      refreshCameraStatusFreshness(camera.id, fallback);
+      refreshCameraStatusFreshness(cameraId, fallback);
     }, remaining + 25);
 
     return () => window.clearTimeout(timer);
-  }, [camera.id, fallback, observation.lastFrameAt, observation.status]);
+  }, [cameraId, fallback, observation.lastFrameAt, observation.status]);
 
   const markSnapshotSuccess = useCallback(() => {
-    reportCameraSnapshotSuccess(camera.id, fallback);
-  }, [camera.id, fallback]);
+    if (cameraId) reportCameraSnapshotSuccess(cameraId, fallback);
+  }, [cameraId, fallback]);
 
   const markSnapshotFailure = useCallback(() => {
-    reportCameraSnapshotFailure(camera.id, fallback);
-  }, [camera.id, fallback]);
+    if (cameraId) reportCameraSnapshotFailure(cameraId, fallback);
+  }, [cameraId, fallback]);
 
   return {
     observation,
