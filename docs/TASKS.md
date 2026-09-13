@@ -8,42 +8,43 @@
 
 ## Current task
 
-### M17.1 — Snapshot proxy memory / payload bounds
+### M18.1 — Clear remaining npm audit findings
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 為 `/api/proxy/snapshot` 的 in-memory cache 設定最大 entries，避免 user-controlled allowed URL variants 無限制增加 Map。
-- [ ] cache 寫入前清理過期 entries；超過上限時淘汰最舊 entry。
-- [ ] 對非 multipart snapshot response 設單張最大 bytes；不得再無上限 `arrayBuffer()`。
-- [ ] multipart JPEG 擷取維持既有 byte cap，並確保 reader / timeout 正常清理。
-- [ ] 不改 hostname allowlist、不改 redirect revalidation、不影響正常 Camera snapshot-first UI。
-- [ ] 補必要 regression tests；`npm audit --audit-level=high`、tests、`npm run build` 全部通過。
+- [ ] 使用 npm 正式更新 lockfile，修補目前剩餘 `baseline-browser-mapping` moderate 與 `postcss-selector-parser` low advisory。
+- [ ] 不手工修改 package-lock integrity / transitive dependency。
+- [ ] 優先使用非 breaking 的 `npm audit fix`；若會升 major 或破壞 build，停止並保留風險說明。
+- [ ] 更新後 `npm audit` 目標為 0 vulnerabilities；至少不得重新出現 high / critical。
+- [ ] `npm run test:security` 與 `npm run build` 全部通過。
+- [ ] 完成後移除一次性 dependency-fix workflow。
 
-完成後再評估 M17.2 是否需要 rate limiting / upstream concurrency guardrail。
+完成後再評估下一個產品功能 milestone，不再為了「有事做」而加入低價值 production guardrail。
 
 ---
 
 ## 近期完成
 
+### M17.1 — Snapshot proxy memory / payload bounds（完成）
+- [x] `/api/proxy/snapshot` cache 改為 64-entry bounded cache、30 秒 TTL；寫入前清理 stale entries，滿載淘汰最舊 entry。
+- [x] 非 multipart snapshot 改為 streaming bounded read，單張上限 2 MiB；不再無上限 `arrayBuffer()`。
+- [x] multipart JPEG 維持 2 MiB byte cap，超限回 502；8 秒 timeout 現涵蓋完整 frame capture，而非只保護 response headers。
+- [x] 新增 `tests/snapshot-resource-limits.test.ts`，涵蓋 TTL、stale prune、oldest eviction、Content-Length 與 chunked body 超限。
+- [x] `test:security` 改跑全部 `tests/*.test.ts`。
+- [x] CI `34730322887`：audit、security/resource tests、production build 全綠。
+- [x] M17.2 per-instance rate limiting 暫不實作：在 serverless 環境不是全域限制，易產生錯誤安全感；若 production metrics 顯示濫用再導入可共享 rate-limit store。
+
 ### M16 — Security regression / attack surface（完成）
-- [x] M16.1 移除未被產品使用、可任意 server-side fetch URL 的 `/api/test-source`；production route list 已移除該端點。CI `34725405017`。
-- [x] user-controlled `url` API route 僅剩 `/api/proxy/image` 與 `/api/proxy/snapshot`，兩者都經共用 allowlist / redirect revalidation。
-- [x] M16.2 新增 `tests/camera-proxy-security.test.ts`，涵蓋官方 host、THB dynamic host、lookalike / loopback、非 HTTP(S)、credentials、redirect revalidation 與 redirect 上限。
-- [x] `tsx` test runner 已鎖入 devDependencies；`npm run test:security` 納入 push / PR CI。
-- [x] 一次性 write-permission setup workflow 已刪除；正常 CI 維持 `contents: read`。
-- [x] 最終 CI `34730221902`：audit、security tests、production build 全綠。
+- [x] M16.1 移除任意 server-side fetch 的 `/api/test-source`；production route list 已移除該端點。CI `34725405017`。
+- [x] M16.2 新增 Camera proxy security regression tests，涵蓋 allowlist、lookalike / loopback、protocol / credentials、redirect revalidation 與 redirect 上限。
+- [x] `tsx` test runner 納入 devDependencies；`npm run test:security` 納入 push / PR CI。
+- [x] 一次性 write-permission setup workflow 已刪除；正常 CI 維持 `contents: read`。最終 CI `34730221902` 全綠。
 
 ### M15 — CI modernization（完成）
 - [x] 官方 actions：`checkout@v7.0.1`、`setup-node@v7.0.0`、`cache@v6.1.0`；專案 runtime Node 22。CI `34725249161`。
-- [x] `.next/cache` 已確認真實 cache hit，production compile 曾由約 5.3s 降至 113ms。
-- [x] 每週一 00:15 UTC read-only dependency audit；首次 run `34725323604` 全綠。
-
-### M14 — Dependency / CI security（完成）
-- [x] Next.js `16.2.1` → `16.3.5`；`fast-xml-parser` `5.5.9` → `5.11.1`。
-- [x] `npm audit` 從 8 個漏洞降為 2 個（0 critical / 0 high / 1 moderate / 1 low）。
-- [x] CI `npm audit --audit-level=high` gate；CI `34725159970` 全綠。
+- [x] `.next/cache` 已確認真實 cache hit；每週 read-only dependency audit 已啟用。
 
 ---
 
@@ -65,7 +66,8 @@
 - [x] **M14 Dependency / CI security** — 完成。
 - [x] **M15 CI modernization** — 完成。
 - [x] **M16 Security regression / attack surface** — 完成。
-- [ ] **M17 Proxy resource controls** — 進行中。
+- [x] **M17 Proxy resource controls** — snapshot bounds 完成；serverless local rate-limit deferred。
+- [ ] **M18 Dependency cleanup** — 進行中。
 
 ---
 
