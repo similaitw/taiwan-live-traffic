@@ -1,24 +1,36 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { Camera } from '@/types/camera';
 import {
   CAMERA_STATUS_STALE_AFTER_MS,
-  effectiveCameraStatus,
   initialCameraStatusObservation,
-  observeSnapshotFailure,
-  observeSnapshotSuccess,
-  type CameraStatusObservation,
 } from '@/lib/camera-status';
+import {
+  getRegisteredCameraStatus,
+  refreshCameraStatusFreshness,
+  reportCameraSnapshotFailure,
+  reportCameraSnapshotSuccess,
+  subscribeCameraStatus,
+} from '@/lib/camera-status-registry';
 
 export function usePassiveCameraStatus(camera: Camera) {
-  const [observation, setObservation] = useState<CameraStatusObservation>(() =>
-    initialCameraStatusObservation(camera),
+  const fallback = useMemo(
+    () => initialCameraStatusObservation(camera),
+    [camera.id, camera.lastCheckedAt, camera.lastFrameAt, camera.status],
   );
 
-  useEffect(() => {
-    setObservation(initialCameraStatusObservation(camera));
-  }, [camera.id, camera.lastCheckedAt, camera.lastFrameAt, camera.status]);
+  const subscribe = useCallback(
+    (listener: () => void) => subscribeCameraStatus(camera.id, listener),
+    [camera.id],
+  );
+
+  const getSnapshot = useCallback(
+    () => getRegisteredCameraStatus(camera.id) ?? fallback,
+    [camera.id, fallback],
+  );
+
+  const observation = useSyncExternalStore(subscribe, getSnapshot, () => fallback);
 
   useEffect(() => {
     if (observation.status !== 'online' || !observation.lastFrameAt) return;
@@ -28,30 +40,24 @@ export function usePassiveCameraStatus(camera: Camera) {
 
     const remaining = CAMERA_STATUS_STALE_AFTER_MS - (Date.now() - lastFrameTime);
     if (remaining <= 0) {
-      setObservation((current) => ({
-        ...current,
-        status: effectiveCameraStatus(current),
-      }));
+      refreshCameraStatusFreshness(camera.id, fallback);
       return;
     }
 
     const timer = window.setTimeout(() => {
-      setObservation((current) => ({
-        ...current,
-        status: effectiveCameraStatus(current),
-      }));
+      refreshCameraStatusFreshness(camera.id, fallback);
     }, remaining + 25);
 
     return () => window.clearTimeout(timer);
-  }, [observation.lastFrameAt, observation.status]);
+  }, [camera.id, fallback, observation.lastFrameAt, observation.status]);
 
   const markSnapshotSuccess = useCallback(() => {
-    setObservation((current) => observeSnapshotSuccess(current));
-  }, []);
+    reportCameraSnapshotSuccess(camera.id, fallback);
+  }, [camera.id, fallback]);
 
   const markSnapshotFailure = useCallback(() => {
-    setObservation((current) => observeSnapshotFailure(current));
-  }, []);
+    reportCameraSnapshotFailure(camera.id, fallback);
+  }, [camera.id, fallback]);
 
   return {
     observation,
