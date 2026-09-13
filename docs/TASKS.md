@@ -8,53 +8,71 @@
 
 ## Current task
 
-### M22.1 — V2 Definition of Done / release-readiness audit
+### M22.2 — Production deployment / browser smoke test
 
 **Executor: ChatGPT**
 
-目標／範圍：
+**目前阻塞：尚無可信的 production URL / Vercel project scope。**
 
-- [ ] 逐項核對 `docs/V2_SPEC.md` §21 V2 MVP Definition of Done，引用目前 repo 實作／CI 證據，不靠印象勾選。
-- [ ] 確認正常 CI 仍包含 npm audit、全部 regression tests、production build。
-- [ ] 檢查正式部署所需環境變數／health endpoint／production checklist 是否與目前程式一致。
-- [ ] 若可從已連接的 Vercel 專案取得正式部署狀態，確認 main 最新部署是否成功；無法存取時明確標示未驗證，不冒充完成。
-- [ ] 產出精簡 release-readiness 文件，區分「repo 已驗證」「production 尚待人工/連接驗證」。
-- [ ] 不新增產品功能；只修正本稽核發現的 release blocker。
+已確認：
 
-完成後若沒有 blocker，V2 可標記 Release Candidate；正式上線 smoke test 另列 M22.2。
+- Vercel connected app `list_teams` 回傳空陣列。
+- repo 未提交 `.vercel/project.json`。
+- repo 搜尋不到 `*.vercel.app` / production URL。
+- 既有個人對話／檔案脈絡未找到此 repo 的 production domain。
+- 公開搜尋結果有其他台灣即時影像網站，但無證據屬於 `similaitw/taiwan-live-traffic`，不得拿來驗收。
+
+取得可信 production URL 或 Vercel access 後執行：
+
+- [ ] 確認 production deployment commit = GitHub `main` 最新 commit。
+- [ ] `/api/health` HTTP 200，commit SHA / environment 正確且不洩漏 secrets。
+- [ ] Camera / rainfall / TDX / CMS API smoke checks。
+- [ ] Snapshot 可用；LIVE 只有手動開啟並可正常停止。
+- [ ] 375px 手機 smoke test。
+- [ ] 768px 平板 smoke test。
+- [ ] 1280px 桌面 smoke test。
+- [ ] Search / Road / Direction / Nearby / Share URL 狀態可恢復。
+- [ ] TDX unavailable 時 graceful degradation 正常。
+
+完成後才能把 Production Release 標記 accepted。
 
 ---
 
 ## 近期完成
 
+### M22.1 — V2 Definition of Done / release-readiness audit（完成）
+- [x] 逐項核對 `docs/V2_SPEC.md` §21，V2 MVP repo-side Definition of Done 全部有實作／CI 證據。
+- [x] 正常 CI 維持 Node 22、`npm ci`、`npm audit --audit-level=high`、全部 regression tests、`npm run build`。
+- [x] `.env.example` 與 server-side TDX env 名稱一致；CWA public OpenData 不需 key。
+- [x] `/api/health` 為 passive / no-store，只回 TDX configured boolean，不暴露 credentials。
+- [x] `/api/cameras` 仍使用 `Promise.allSettled` 保持 partial success。
+- [x] Camera proxy 仍有 hostname allowlist、URL credential rejection、manual redirect revalidation、最多 4 跳。
+- [x] 產出 `docs/V2_RELEASE_READINESS.md`，清楚區分 repo RC 與 production acceptance。
+- [x] Release-readiness 文件 commit 後正常 CI `34733089266` 全綠。
+- [x] 結論：**Repo 可標記 V2 Release Candidate；Production Release 尚未接受。**
+
 ### M21 — Accessibility / interaction hardening（完成）
-- [x] M21.1：全站 `:focus-visible`、`prefers-reduced-motion`；CameraModal 補 `role="dialog"`、`aria-modal`、標題關聯；主要 icon buttons / status text 稽核完成。CI `34732812658`。
-- [x] M21.2：CameraModal 開啟時保存／移入 focus，Tab / Shift+Tab trap，Escape 沿用關閉 workflow，關閉後還原原操作元素；Bottom Sheet 維持非 modal。Feature commit `1035e65a2b2eceeb407c7fc6cce1e96a40739143`。
-- [x] one-shot setup 已移除；最終正常 CI `34732975943` 全綠。
+- [x] 全站 focus-visible / reduced-motion、dialog semantics、文字化狀態。
+- [x] CameraModal focus save / trap / restore；Bottom Sheet 維持非 modal。
+- [x] 最終正常 CI `34732975943` 全綠。
 
 ### M20 — Direction-aware road mode（完成）
-- [x] 共用 direction normalization；道路方向 filter；canonical `direction=` URL；Trip Mode 中文顯示／canonical 分享；Desktop / mobile 皆可操作。最終 CI `34732610626`。
-
-### M19 — Passive Camera status（完成）
-- [x] 實際 snapshot 成敗建立 passive status；Card / Bottom Sheet / Modal 共用 session registry；真正 live `onLoad` 才顯示 LIVE。
-
-### M18 — Dependency cleanup（完成）
-- [x] 非 breaking `npm audit fix` 後為 **0 vulnerabilities**。
+- [x] 道路方向 normalization / filter / URL / Trip Mode integration；最終 CI `34732610626`。
 
 ---
 
 ## Milestone / CI 索引
 
-- [x] **M1 基礎資料模型** — Camera V2、geo、hooks。
-- [x] **M2 UI 2.0** — mobile map-first、desktop sidebar、Bottom Sheet。
-- [x] **M3 地圖效能** — clustering / viewport diff。
-- [x] **M4 使用者功能** — 收藏、最近、分享/URL。
-- [x] **M5 道路模式** — grouping、navigator、nearby。
-- [x] **M6 即時事件** — TDX event foundation / overlay。
-- [x] **M7 壅塞／旅行速度** — TDX flow / shape / overlay。
-- [x] **M8 CMS** — foundation / overlay / filters。
-- [x] **M9 天氣／降雨** — CWA rainfall / radar / CCTV cross-check。
-- [x] **M10 圖層控制** — unified controls / mobile polish / preferences。
+- [x] **M1 基礎資料模型**。
+- [x] **M2 UI 2.0**。
+- [x] **M3 地圖效能**。
+- [x] **M4 使用者功能**。
+- [x] **M5 道路模式**。
+- [x] **M6 即時事件**。
+- [x] **M7 壅塞／旅行速度**。
+- [x] **M8 CMS**。
+- [x] **M9 天氣／降雨**。
+- [x] **M10 圖層控制**。
 - [x] **M11 Production hardening**。
 - [x] **M12 Route / Trip Mode**。
 - [x] **M13 Search V2**。
@@ -66,7 +84,7 @@
 - [x] **M19 Passive Camera status**。
 - [x] **M20 Direction-aware road mode**。
 - [x] **M21 Accessibility / interaction hardening**。
-- [ ] **M22 V2 release readiness** — M22.1 進行中。
+- [ ] **M22 V2 release readiness** — repo RC ready；M22.2 production smoke test blocked by production URL/access。
 
 ---
 
