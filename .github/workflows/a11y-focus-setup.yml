@@ -1,0 +1,78 @@
+name: One-shot modal focus workflow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/a11y-focus-setup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-focus-workflow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply modal focus workflow
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('components/CameraModal.tsx')
+          text = path.read_text()
+
+          def replace(old, new):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one match, found {count}: {old[:100]!r}')
+              text = text.replace(old, new)
+
+          replace("import { useEffect, useState } from 'react';", "import { useEffect, useRef, useState } from 'react';")
+          replace("  const [streamKey, setStreamKey] = useState(0);\n  const { observation, markSnapshotSuccess, markSnapshotFailure } = usePassiveCameraStatus(camera);", "  const [streamKey, setStreamKey] = useState(0);\n  const dialogRef = useRef<HTMLDivElement>(null);\n  const closeButtonRef = useRef<HTMLButtonElement>(null);\n  const previousFocusRef = useRef<HTMLElement | null>(null);\n  const wasOpenRef = useRef(false);\n  const { observation, markSnapshotSuccess, markSnapshotFailure } = usePassiveCameraStatus(camera);")
+
+          old_effect = "  useEffect(() => {\n    const handler = (event: KeyboardEvent) => {\n      if (event.key === 'Escape') onClose();\n    };\n    document.addEventListener('keydown', handler);\n    return () => document.removeEventListener('keydown', handler);\n  }, [onClose]);"
+          new_effect = "  useEffect(() => {\n    const isOpen = Boolean(camera);\n    if (isOpen && !wasOpenRef.current) {\n      previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;\n      wasOpenRef.current = true;\n      const frame = requestAnimationFrame(() => closeButtonRef.current?.focus());\n      return () => cancelAnimationFrame(frame);\n    }\n\n    if (!isOpen && wasOpenRef.current) {\n      const previous = previousFocusRef.current;\n      previousFocusRef.current = null;\n      wasOpenRef.current = false;\n      if (previous?.isConnected) requestAnimationFrame(() => previous.focus());\n    }\n  }, [camera?.id]);\n\n  useEffect(() => () => {\n    const previous = previousFocusRef.current;\n    previousFocusRef.current = null;\n    if (previous?.isConnected) previous.focus();\n  }, []);\n\n  useEffect(() => {\n    if (!camera) return;\n\n    const handler = (event: KeyboardEvent) => {\n      if (event.key === 'Escape') {\n        event.preventDefault();\n        onClose();\n        return;\n      }\n      if (event.key !== 'Tab') return;\n\n      const dialog = dialogRef.current;\n      if (!dialog) return;\n      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(\n        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex=\"-1\"])'\n      )).filter((element) => element.getClientRects().length > 0);\n\n      if (focusable.length === 0) {\n        event.preventDefault();\n        dialog.focus();\n        return;\n      }\n\n      const first = focusable[0]!;\n      const last = focusable[focusable.length - 1]!;\n      const active = document.activeElement;\n      if (event.shiftKey && (active === first || !dialog.contains(active))) {\n        event.preventDefault();\n        last.focus();\n      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {\n        event.preventDefault();\n        first.focus();\n      }\n    };\n\n    document.addEventListener('keydown', handler);\n    return () => document.removeEventListener('keydown', handler);\n  }, [camera, onClose]);"
+          replace(old_effect, new_effect)
+
+          replace("      <div\n        role=\"dialog\"\n        aria-modal=\"true\"\n        aria-labelledby=\"camera-modal-title\"", "      <div\n        ref={dialogRef}\n        tabIndex={-1}\n        role=\"dialog\"\n        aria-modal=\"true\"\n        aria-labelledby=\"camera-modal-title\"")
+          replace("          <button type=\"button\" onClick={onClose} title=\"關閉\" aria-label=\"關閉\"", "          <button ref={closeButtonRef} type=\"button\" onClick={onClose} title=\"關閉\" aria-label=\"關閉\"")
+
+          path.write_text(text)
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Regression tests
+        run: npm run test:security
+
+      - name: Production build
+        run: npm run build
+
+      - name: Validate diff
+        run: git diff --check
+
+      - name: Commit modal focus workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/CameraModal.tsx
+          git commit -m "a11y: trap and restore camera modal focus"
+          git push origin HEAD:main
