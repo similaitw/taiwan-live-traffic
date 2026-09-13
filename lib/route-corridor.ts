@@ -1,3 +1,4 @@
+import { directionMatches } from '@/lib/directions';
 import { getDistance } from '@/lib/geo';
 import { getCameraRoadNumber, normalizeRoadNumber } from '@/lib/roads';
 import type { Camera } from '@/types/camera';
@@ -8,25 +9,6 @@ import type { TrafficEvent } from '@/types/traffic-event';
 import type { TrafficFlowMapSegment } from '@/types/traffic-flow';
 
 const DEFAULT_RAINFALL_ANCHOR_RADIUS_METERS = 15_000;
-
-function normalizeDirection(value?: string): string | undefined {
-  if (!value) return undefined;
-  const normalized = value.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, '');
-  if (!normalized) return undefined;
-
-  if (/北上|北向|往北|northbound|\bnb\b|^n$/i.test(normalized)) return 'north';
-  if (/南下|南向|往南|southbound|\bsb\b|^s$/i.test(normalized)) return 'south';
-  if (/東向|往東|eastbound|\beb\b|^e$/i.test(normalized)) return 'east';
-  if (/西向|往西|westbound|\bwb\b|^w$/i.test(normalized)) return 'west';
-
-  return normalized;
-}
-
-function directionMatches(filterDirection?: string, value?: string): boolean {
-  if (!filterDirection) return true;
-  if (!value) return true;
-  return normalizeDirection(filterDirection) === normalizeDirection(value);
-}
 
 function itemRoadNumber(...values: Array<string | undefined>): string | undefined {
   for (const value of values) {
