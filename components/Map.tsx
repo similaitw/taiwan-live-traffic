@@ -427,7 +427,7 @@ export default function Map({ cameras, query, direction, onSelect, userLocation 
 
   return (
     <div
-      className="relative w-full h-full overflow-hidden rounded-none md:rounded-xl"
+      className="relative isolate z-0 w-full h-full overflow-hidden rounded-none md:rounded-xl"
       style={{
         border: '1px solid var(--border-subtle)',
         boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
