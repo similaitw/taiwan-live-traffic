@@ -243,7 +243,11 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current).setView([23.9, 121.0], 8);
     mapRef.current = map;
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+      className: 'traffic-basemap-tile',
+    }).addTo(map);
     const radarPane = map.createPane('radarPane');
     radarPane.style.zIndex = '250';
     radarPane.style.pointerEvents = 'none';

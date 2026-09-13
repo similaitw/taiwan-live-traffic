@@ -203,3 +203,7 @@ html, body {
     scroll-behavior: auto !important;
   }
 }
+/* Apply the dark palette only to the base map, never radar or markers. */
+.traffic-basemap-tile {
+  filter: grayscale(1) invert(1) brightness(0.8);
+}

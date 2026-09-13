@@ -44,6 +44,12 @@
 
 ## 近期完成
 
+### 底圖顯示 hotfix
+- [x] 依使用者回報修正 CARTO 圖磚顯示 API KEY REQUIRED：改用 OpenStreetMap 標準圖磚並保留來源標示。
+- [x] 深色濾鏡僅套用底圖，保留雷達與標記原色。
+- 本機 Vercel CLI 可使用 production scope；connector 的 403 不影響 CLI 部署。M22.2 完整驗收仍待完成。
+
+
 ### M22.1 — V2 Definition of Done / release-readiness audit（完成）
 - [x] 逐項核對 `docs/V2_SPEC.md` §21，V2 MVP repo-side Definition of Done 全部有實作／CI 證據。
 - [x] 正常 CI 維持 Node 22、`npm ci`、`npm audit --audit-level=high`、全部 regression tests、`npm run build`。
