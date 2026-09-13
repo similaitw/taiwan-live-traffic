@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { Camera } from '@/types/camera';
+import { buildDirectionOptions, directionMatches, normalizeTravelDirection, type TravelDirection } from '@/lib/directions';
 import { getDistance } from '@/lib/geo';
 import { matchesCameraSearch } from '@/lib/camera-search';
 import { getCameraRoadNumber, getRoadNeighbors, groupCamerasByRoad } from '@/lib/roads';
@@ -14,6 +15,7 @@ import CameraModal from '@/components/CameraModal';
 import CameraBottomSheet from '@/components/CameraBottomSheet';
 import CameraShareButton from '@/components/CameraShareButton';
 import RoadFilter from '@/components/RoadFilter';
+import DirectionFilter from '@/components/DirectionFilter';
 import RoadCameraNavigator from '@/components/RoadCameraNavigator';
 import NearbyFilter, { type NearbyRadius } from '@/components/NearbyFilter';
 import Map from '@/components/Map';
@@ -57,6 +59,7 @@ export default function HomePage() {
   const [liveCamera, setLiveCamera] = useState<Camera | null>(null);
   const [typeFilter, setTypeFilter] = useState<Camera['type'] | 'all'>('all');
   const [selectedRoad, setSelectedRoad] = useState<string | null>(null);
+  const [selectedDirection, setSelectedDirection] = useState<TravelDirection | null>(null);
   const [nearbyRadius, setNearbyRadius] = useState<NearbyRadius | null>(null);
   const [sortByNearest, setSortByNearest] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -73,6 +76,10 @@ export default function HomePage() {
   } = useGeolocation({ autoLocate: true });
 
   const roadGroups = useMemo(() => groupCamerasByRoad(cameras), [cameras]);
+  const directionOptions = useMemo(() => {
+    const group = selectedRoad ? roadGroups.find((item) => item.roadNumber === selectedRoad) : undefined;
+    return group ? buildDirectionOptions(group.cameras.map((camera) => camera.direction)) : [];
+  }, [roadGroups, selectedRoad]);
   const mobileRoadNeighbors = useMemo(
     () => (mobileSelected ? getRoadNeighbors(cameras, mobileSelected) : null),
     [cameras, mobileSelected]
@@ -98,6 +105,8 @@ export default function HomePage() {
     const type = params.get('type');
     if (validCameraType(type)) setTypeFilter(type);
     setSelectedRoad(params.get('road'));
+    const direction = normalizeTravelDirection(params.get('direction'));
+    if (direction) setSelectedDirection(direction);
     setNearbyRadius(parseNearbyRadius(params.get('nearby')));
     pendingCameraIdRef.current = params.get('camera');
     setUrlReady(true);
@@ -120,9 +129,10 @@ export default function HomePage() {
       q: query.trim() || null,
       type: typeFilter === 'all' ? null : typeFilter,
       road: selectedRoad,
+      direction: selectedRoad ? selectedDirection : null,
       nearby: nearbyRadius ? String(nearbyRadius) : null,
     });
-  }, [nearbyRadius, query, selectedRoad, typeFilter, updateUrl, urlReady]);
+  }, [nearbyRadius, query, selectedDirection, selectedRoad, typeFilter, updateUrl, urlReady]);
 
   useEffect(() => {
     if (loading || !selectedRoad || roadGroups.length === 0) return;
@@ -130,6 +140,17 @@ export default function HomePage() {
       setSelectedRoad(null);
     }
   }, [loading, roadGroups, selectedRoad]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!selectedRoad) {
+      if (selectedDirection) setSelectedDirection(null);
+      return;
+    }
+    if (selectedDirection && !directionOptions.some((option) => option.value === selectedDirection)) {
+      setSelectedDirection(null);
+    }
+  }, [directionOptions, loading, selectedDirection, selectedRoad]);
 
   useEffect(() => {
     if (!urlReady || loading || cameras.length === 0) return;
@@ -186,6 +207,11 @@ export default function HomePage() {
     [toggleFavorite]
   );
 
+  const handleRoadChange = useCallback((road: string | null) => {
+    setSelectedRoad(road);
+    setSelectedDirection(null);
+  }, []);
+
   const handleNearbyChange = useCallback((radius: NearbyRadius | null) => {
     setNearbyRadius(radius);
     if (radius && !userLocation) locateMe();
@@ -200,6 +226,7 @@ export default function HomePage() {
   const filtered = cameras
     .filter((camera) => {
       if (selectedRoad && getCameraRoadNumber(camera) !== selectedRoad) return false;
+      if (selectedDirection && !directionMatches(selectedDirection, camera.direction)) return false;
       if (favoritesOnly && !favoriteIdSet.has(camera.id)) return false;
       if (recentOnly && !recentIdSet.has(camera.id)) return false;
       if (typeFilter !== 'all' && camera.type !== typeFilter) return false;
@@ -357,7 +384,7 @@ export default function HomePage() {
                   cameras={cameras}
                   value={query}
                   onChange={setQuery}
-                  onSelectRoad={setSelectedRoad}
+                  onSelectRoad={handleRoadChange}
                   onSelectCamera={handleDesktopSelect}
                   placeholder="搜尋道路、地點、監視器…"
                 />
@@ -366,7 +393,8 @@ export default function HomePage() {
                   {typeChips()}
                   {favoriteChip()}
                   {recentChip()}
-                  <RoadFilter groups={roadGroups} value={selectedRoad} onChange={setSelectedRoad} />
+                  <RoadFilter groups={roadGroups} value={selectedRoad} onChange={handleRoadChange} />
+                  <DirectionFilter options={directionOptions} value={selectedDirection} onChange={setSelectedDirection} />
                   <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} />
                 </div>
 
@@ -432,6 +460,7 @@ export default function HomePage() {
               <Map
                 cameras={filteredCameras}
                 query=""
+                direction={selectedDirection ?? undefined}
                 onSelect={handleDesktopSelect}
                 userLocation={userLocation}
               />
@@ -445,7 +474,7 @@ export default function HomePage() {
                   cameras={cameras}
                   value={query}
                   onChange={setQuery}
-                  onSelectRoad={setSelectedRoad}
+                  onSelectRoad={handleRoadChange}
                   onSelectCamera={handleMobileSelect}
                   placeholder="搜尋道路、地點、監視器…"
                 />
@@ -456,7 +485,8 @@ export default function HomePage() {
               {typeChips(true)}
               {favoriteChip(true)}
               {recentChip(true)}
-              <RoadFilter groups={roadGroups} value={selectedRoad} onChange={setSelectedRoad} compact />
+              <RoadFilter groups={roadGroups} value={selectedRoad} onChange={handleRoadChange} compact />
+              <DirectionFilter options={directionOptions} value={selectedDirection} onChange={setSelectedDirection} compact />
               <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} compact />
             </div>
 
@@ -520,6 +550,7 @@ export default function HomePage() {
                 <Map
                   cameras={filteredCameras}
                   query=""
+                  direction={selectedDirection ?? undefined}
                   onSelect={handleMobileSelect}
                   userLocation={userLocation}
                 />

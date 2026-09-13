@@ -8,6 +8,7 @@ import type { RainfallResponse, RainfallStation } from '@/types/rainfall';
 import type { TrafficEvent, TrafficEventsResponse } from '@/types/traffic-event';
 import type { TrafficFlowMapSegment, TrafficFlowResponse } from '@/types/traffic-flow';
 import type { TrafficSectionsResponse } from '@/types/traffic-section';
+import type { TravelDirection } from '@/lib/directions';
 import { getDistance } from '@/lib/geo';
 import { getCameraRoadNumber, groupCamerasByRoad, normalizeRoadNumber } from '@/lib/roads';
 import { buildRouteCorridor } from '@/lib/route-corridor';
@@ -28,6 +29,7 @@ const LAYER_PREFERENCES_KEY = 'taiwan-live-traffic:map-layers:v1';
 interface Props {
   cameras: Camera[];
   query: string;
+  direction?: TravelDirection;
   onSelect: (c: Camera) => void;
   userLocation?: { lat: number; lng: number } | null;
 }
@@ -97,7 +99,7 @@ function sourceDetail(status: ApiSourceStatus, partialDetail?: string): string |
   return undefined;
 }
 
-export default function Map({ cameras, query, onSelect, userLocation }: Props) {
+export default function Map({ cameras, query, direction, onSelect, userLocation }: Props) {
   const [trafficEvents, setTrafficEvents] = useState<TrafficEvent[]>([]);
   const [trafficEnabled, setTrafficEnabled] = useState(false);
   const [eventsHealth, setEventsHealth] = useState<LayerHealth>({ status: 'loading', provider: 'TDX' });
@@ -398,6 +400,7 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
     if (!corridorRoad) return null;
     return buildRouteCorridor({
       roadNumber: corridorRoad,
+      direction,
       cameras,
       trafficFlowSegments: flowEnabled ? congestionSegments : undefined,
       trafficEvents: trafficEnabled ? trafficEvents : undefined,
@@ -410,6 +413,7 @@ export default function Map({ cameras, query, onSelect, userLocation }: Props) {
     cmsEnabled,
     congestionSegments,
     corridorRoad,
+    direction,
     flowEnabled,
     rainfallEnabled,
     rainfallStations,

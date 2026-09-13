@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { normalizeTravelDirection, travelDirectionLabel } from '@/lib/directions';
 import type { Camera } from '@/types/camera';
 import type { RouteCorridor } from '@/types/route-corridor';
 
@@ -66,6 +67,10 @@ export default function TripModeSummary({ corridor }: Props) {
   const [open, setOpen] = useState(false);
   const [cameraIndex, setCameraIndex] = useState(0);
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
+  const directionLabel = useMemo(() => {
+    const normalized = normalizeTravelDirection(corridor.direction);
+    return normalized ? travelDirectionLabel(normalized) : corridor.direction?.trim();
+  }, [corridor.direction]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -93,7 +98,7 @@ export default function TripModeSummary({ corridor }: Props) {
 
   const handleShare = async () => {
     const shareUrl = corridorUrl(corridor);
-    const directionText = corridor.direction ? ` ${corridor.direction}` : '';
+    const directionText = directionLabel ? ` ${directionLabel}` : '';
 
     try {
       if (navigator.share) {
@@ -146,7 +151,7 @@ export default function TripModeSummary({ corridor }: Props) {
                   TRIP MODE
                 </span>
                 <span className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>
-                  {corridor.roadNumber}{corridor.direction ? ` ${corridor.direction}` : ''} 沿線
+                  {corridor.roadNumber}{directionLabel ? ` ${directionLabel}` : ''} 沿線
                 </span>
               </div>
               <p className="mt-1 text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
@@ -290,7 +295,7 @@ export default function TripModeSummary({ corridor }: Props) {
           aria-label={`開啟 ${corridor.roadNumber} 沿線摘要`}
         >
           <span aria-hidden="true">⇢</span>
-          <span>{corridor.roadNumber}{corridor.direction ? ` ${corridor.direction}` : ''} 沿線</span>
+          <span>{corridor.roadNumber}{directionLabel ? ` ${directionLabel}` : ''} 沿線</span>
           {(corridor.summary.congestionSegmentCount > 0 || corridor.summary.eventCount > 0) && (
             <span className="rounded-full px-1.5 py-0.5 font-mono text-[9px]"
               style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}>
