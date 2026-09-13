@@ -30,6 +30,11 @@ html, body {
   font-family: 'Noto Sans TC', sans-serif;
 }
 
+:where(button, a, input, select, textarea, [role='button'], [tabindex]):focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -181,5 +186,20 @@ html, body {
   .leaflet-control-attribution {
     max-width: 68vw;
     line-height: 1.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
