@@ -8,49 +8,42 @@
 
 ## Current task
 
-### M16.2 — Camera proxy security regression tests
+### M17.1 — Snapshot proxy memory / payload bounds
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] 為 `lib/camera-proxy-security.ts` 補行為測試，不只做原始碼字串檢查。
-- [ ] 驗證合法官方 Camera host 與 THB 動態 host pattern 可通過。
-- [ ] 驗證任意 hostname、lookalike hostname、localhost / loopback、非 HTTP(S)、含 URL credentials 都被拒絕。
-- [ ] mock `fetch()` 驗證 upstream redirect 每一跳都重新經 allowlist；允許同 host/合法 host redirect，拒絕跳往非 allowlist host。
-- [ ] 測試納入 push / pull_request CI，在 production build 前執行。
-- [ ] 不更改 Camera API response shape，不放寬現有 allowlist。
-- [ ] `npm audit --audit-level=high`、security tests、`npm run build` 全部通過。
+- [ ] 為 `/api/proxy/snapshot` 的 in-memory cache 設定最大 entries，避免 user-controlled allowed URL variants 無限制增加 Map。
+- [ ] cache 寫入前清理過期 entries；超過上限時淘汰最舊 entry。
+- [ ] 對非 multipart snapshot response 設單張最大 bytes；不得再無上限 `arrayBuffer()`。
+- [ ] multipart JPEG 擷取維持既有 byte cap，並確保 reader / timeout 正常清理。
+- [ ] 不改 hostname allowlist、不改 redirect revalidation、不影響正常 Camera snapshot-first UI。
+- [ ] 補必要 regression tests；`npm audit --audit-level=high`、tests、`npm run build` 全部通過。
 
-完成後 M16 Security regression / attack surface 結案。
+完成後再評估 M17.2 是否需要 rate limiting / upstream concurrency guardrail。
 
 ---
 
 ## 近期完成
 
-### M16.1 — Production attack-surface cleanup（完成）
-- [x] 移除未被產品使用、可由 query parameter 讓 server 任意 `fetch()` URL 的 `/api/test-source` 開發診斷端點。
-- [x] repo 內沒有產品功能依賴 `/api/test-source`。
-- [x] user-controlled `url` API route 僅剩 `/api/proxy/image` 與 `/api/proxy/snapshot`，兩者都經 `camera-proxy-security` allowlist / redirect revalidation。
-- [x] production build route list 已不再出現 `/api/test-source`。
-- [x] `npm audit --audit-level=high` 與 production build 通過；CI `34725405017` 全綠。
+### M16 — Security regression / attack surface（完成）
+- [x] M16.1 移除未被產品使用、可任意 server-side fetch URL 的 `/api/test-source`；production route list 已移除該端點。CI `34725405017`。
+- [x] user-controlled `url` API route 僅剩 `/api/proxy/image` 與 `/api/proxy/snapshot`，兩者都經共用 allowlist / redirect revalidation。
+- [x] M16.2 新增 `tests/camera-proxy-security.test.ts`，涵蓋官方 host、THB dynamic host、lookalike / loopback、非 HTTP(S)、credentials、redirect revalidation 與 redirect 上限。
+- [x] `tsx` test runner 已鎖入 devDependencies；`npm run test:security` 納入 push / PR CI。
+- [x] 一次性 write-permission setup workflow 已刪除；正常 CI 維持 `contents: read`。
+- [x] 最終 CI `34730221902`：audit、security tests、production build 全綠。
 
 ### M15 — CI modernization（完成）
-- [x] M15.1 升級官方 actions：`checkout@v7.0.1`、`setup-node@v7.0.0`、`cache@v6.1.0`；專案 runtime 仍為 Node 22。CI `34725249161`。
-- [x] 新增 `.next/cache`；後續 run log 明確 `Cache hit for: Linux-nextjs-...`，production compile 約由 5.3s 降至 113ms。
-- [x] push / PR CI 保留 `npm ci` + `npm audit --audit-level=high` + `npm run build`，workflow 僅 `contents: read`。
-- [x] M15.2 新增每週一 00:15 UTC（台灣約 08:15）read-only dependency audit；不自動修改依賴、不 push main。首次 audit run `34725323604` 全綠。
-- [x] 新 audit workflow commit 的正常 CI `34725323559` 也全綠。
+- [x] 官方 actions：`checkout@v7.0.1`、`setup-node@v7.0.0`、`cache@v6.1.0`；專案 runtime Node 22。CI `34725249161`。
+- [x] `.next/cache` 已確認真實 cache hit，production compile 曾由約 5.3s 降至 113ms。
+- [x] 每週一 00:15 UTC read-only dependency audit；首次 run `34725323604` 全綠。
 
 ### M14 — Dependency / CI security（完成）
-- [x] Next.js `16.2.1` → `16.3.5`；`fast-xml-parser` `5.5.9` → `5.11.1`，由 npm 在 GitHub runner 正式重建 lockfile。
-- [x] `npm audit` 從 8 個漏洞（1 critical / 4 high / 2 moderate / 1 low）降為 2 個（0 critical / 0 high / 1 moderate / 1 low）。
-- [x] CI 新增 `npm audit --audit-level=high`；最終 CI `34725159970` 全綠。
-
-### M13 — Search V2（完成）
-- [x] M13.1 共用 matcher：name / ID / road / roadNumber / county / district / mile / direction / tags。CI `34724600973`。
-- [x] M13.2 分類建議：道路／地區／監視器；鍵盤操作與行動版高度限制。CI `34724916576`。
-- [x] M13.3 URL / ARIA polish。CI `34724980764`。
+- [x] Next.js `16.2.1` → `16.3.5`；`fast-xml-parser` `5.5.9` → `5.11.1`。
+- [x] `npm audit` 從 8 個漏洞降為 2 個（0 critical / 0 high / 1 moderate / 1 low）。
+- [x] CI `npm audit --audit-level=high` gate；CI `34725159970` 全綠。
 
 ---
 
@@ -71,7 +64,8 @@
 - [x] **M13 Search V2** — 完成。
 - [x] **M14 Dependency / CI security** — 完成。
 - [x] **M15 CI modernization** — 完成。
-- [ ] **M16 Security regression / attack surface** — 進行中。
+- [x] **M16 Security regression / attack surface** — 完成。
+- [ ] **M17 Proxy resource controls** — 進行中。
 
 ---
 
