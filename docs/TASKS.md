@@ -8,22 +8,32 @@
 
 ## Current task
 
-### M16.1 — Production attack-surface cleanup
+### M16.2 — Camera proxy security regression tests
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [x] 移除未被產品使用、可由 query parameter 讓 server 任意 `fetch()` URL 的 `/api/test-source` 開發診斷端點。
-- [x] 搜尋 API routes 的 user-controlled `url` query；保留的 `/api/proxy/image` 與 `/api/proxy/snapshot` 必須繼續經共用 allowlist / redirect revalidation。
-- [ ] production build route list 不再出現 `/api/test-source`。
-- [ ] `npm audit --audit-level=high` 與 `npm run build` 通過。
+- [ ] 為 `lib/camera-proxy-security.ts` 補行為測試，不只做原始碼字串檢查。
+- [ ] 驗證合法官方 Camera host 與 THB 動態 host pattern 可通過。
+- [ ] 驗證任意 hostname、lookalike hostname、localhost / loopback、非 HTTP(S)、含 URL credentials 都被拒絕。
+- [ ] mock `fetch()` 驗證 upstream redirect 每一跳都重新經 allowlist；允許同 host/合法 host redirect，拒絕跳往非 allowlist host。
+- [ ] 測試納入 push / pull_request CI，在 production build 前執行。
+- [ ] 不更改 Camera API response shape，不放寬現有 allowlist。
+- [ ] `npm audit --audit-level=high`、security tests、`npm run build` 全部通過。
 
-完成後再評估 M16.2 是否需要補 security regression tests / route allowlist tests。
+完成後 M16 Security regression / attack surface 結案。
 
 ---
 
 ## 近期完成
+
+### M16.1 — Production attack-surface cleanup（完成）
+- [x] 移除未被產品使用、可由 query parameter 讓 server 任意 `fetch()` URL 的 `/api/test-source` 開發診斷端點。
+- [x] repo 內沒有產品功能依賴 `/api/test-source`。
+- [x] user-controlled `url` API route 僅剩 `/api/proxy/image` 與 `/api/proxy/snapshot`，兩者都經 `camera-proxy-security` allowlist / redirect revalidation。
+- [x] production build route list 已不再出現 `/api/test-source`。
+- [x] `npm audit --audit-level=high` 與 production build 通過；CI `34725405017` 全綠。
 
 ### M15 — CI modernization（完成）
 - [x] M15.1 升級官方 actions：`checkout@v7.0.1`、`setup-node@v7.0.0`、`cache@v6.1.0`；專案 runtime 仍為 Node 22。CI `34725249161`。
