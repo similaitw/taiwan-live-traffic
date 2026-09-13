@@ -32,22 +32,13 @@ jobs:
           from pathlib import Path
           path = Path('components/CameraModal.tsx')
           text = path.read_text()
-
-          old = '''      <div
-        className="overflow-hidden w-full max-w-3xl transition-all duration-300"
-        style={{'''
-          new = '''      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="camera-modal-title"
-        className="overflow-hidden w-full max-w-3xl transition-all duration-300"
-        style={{'''
+          old = "      <div\n        className=\"overflow-hidden w-full max-w-3xl transition-all duration-300\"\n        style={{"
+          new = "      <div\n        role=\"dialog\"\n        aria-modal=\"true\"\n        aria-labelledby=\"camera-modal-title\"\n        className=\"overflow-hidden w-full max-w-3xl transition-all duration-300\"\n        style={{"
           if text.count(old) != 1:
               raise SystemExit(f'expected one modal container match, found {text.count(old)}')
           text = text.replace(old, new)
-
-          old_title = '''            <h2 className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{camera.name}</h2>'''
-          new_title = '''            <h2 id="camera-modal-title" className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{camera.name}</h2>'''
+          old_title = "            <h2 className=\"text-sm font-bold truncate\" style={{ color: 'var(--text-primary)' }}>{camera.name}</h2>"
+          new_title = "            <h2 id=\"camera-modal-title\" className=\"text-sm font-bold truncate\" style={{ color: 'var(--text-primary)' }}>{camera.name}</h2>"
           if text.count(old_title) != 1:
               raise SystemExit(f'expected one modal title match, found {text.count(old_title)}')
           text = text.replace(old_title, new_title)
