@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Camera, CameraStatus } from '@/types/camera';
 import { usePassiveCameraStatus } from '@/hooks/usePassiveCameraStatus';
 
@@ -37,6 +37,10 @@ export default function CameraModal({ camera, onClose }: Props) {
   const [liveActive, setLiveActive] = useState(false);
   const [streamState, setStreamState] = useState<StreamState>('idle');
   const [streamKey, setStreamKey] = useState(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
   const { observation, markSnapshotSuccess, markSnapshotFailure } = usePassiveCameraStatus(camera);
 
   useEffect(() => {
@@ -50,12 +54,66 @@ export default function CameraModal({ camera, onClose }: Props) {
   }, [camera?.id, camera]);
 
   useEffect(() => {
+    const isOpen = Boolean(camera);
+    if (isOpen && !wasOpenRef.current) {
+      previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      wasOpenRef.current = true;
+      const frame = requestAnimationFrame(() => closeButtonRef.current?.focus());
+      return () => cancelAnimationFrame(frame);
+    }
+
+    if (!isOpen && wasOpenRef.current) {
+      const previous = previousFocusRef.current;
+      previousFocusRef.current = null;
+      wasOpenRef.current = false;
+      if (previous?.isConnected) requestAnimationFrame(() => previous.focus());
+    }
+  }, [camera?.id]);
+
+  useEffect(() => () => {
+    const previous = previousFocusRef.current;
+    previousFocusRef.current = null;
+    if (previous?.isConnected) previous.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!camera) return;
+
     const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )).filter((element) => element.getClientRects().length > 0);
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !dialog.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [camera, onClose]);
 
   useEffect(() => {
     const stopBackgroundLive = () => {
@@ -135,6 +193,8 @@ export default function CameraModal({ camera, onClose }: Props) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="camera-modal-title"
@@ -165,7 +225,7 @@ export default function CameraModal({ camera, onClose }: Props) {
               <span className="text-[9px] font-bold font-mono tracking-wider" style={{ color: status.color }}>{status.label}</span>
             </span>
           </div>
-          <button type="button" onClick={onClose} title="關閉" aria-label="關閉" className="shrink-0 ml-3 w-10 h-10 rounded-lg flex items-center justify-center transition-colors duration-150" style={{ color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)' }}>
+          <button ref={closeButtonRef} type="button" onClick={onClose} title="關閉" aria-label="關閉" className="shrink-0 ml-3 w-10 h-10 rounded-lg flex items-center justify-center transition-colors duration-150" style={{ color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)' }}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
