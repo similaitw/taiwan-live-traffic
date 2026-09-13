@@ -12,19 +12,23 @@
 
 **Executor: ChatGPT**
 
-**目前阻塞：尚無可信的 production URL / Vercel project scope。**
+**正式部署網址已取得，但目前阻塞在 Vercel team scope 授權。**
+
+正式網址：
+
+`https://taiwan-live-traffic-4xtnqcy76-similaitws-projects.vercel.app/`
 
 已確認：
 
-- Vercel connected app `list_teams` 回傳空陣列。
-- repo 未提交 `.vercel/project.json`。
-- repo 搜尋不到 `*.vercel.app` / production URL。
-- 既有個人對話／檔案脈絡未找到此 repo 的 production domain。
-- 公開搜尋結果有其他台灣即時影像網站，但無證據屬於 `similaitw/taiwan-live-traffic`，不得拿來驗收。
+- Vercel API 能由網址辨識 team scope 為 `similaitws-projects`。
+- `get_deployment` 回傳 `403 Not authorized`，明確要求重新授權該 team scope；不是 project 不存在。
+- Vercel share / protected deployment fetch 同樣因 403 team scope 無法建立。
+- 此 ChatGPT 執行環境直接解析該 deployment hostname 亦失敗，因此不能用外部 DNS / browser fallback 冒充正式站 smoke test。
+- repo 未提交 `.vercel/project.json`；GitHub commit status 也沒有可用的 Vercel deployment status 可交叉驗證。
 
-取得可信 production URL 或 Vercel access 後執行：
+取得 Vercel `similaitws-projects` scope 授權後立即執行：
 
-- [ ] 確認 production deployment commit = GitHub `main` 最新 commit。
+- [ ] 確認這個 deployment 是 Production（不是單純 Preview）且部署 commit = GitHub `main` 最新 commit。
 - [ ] `/api/health` HTTP 200，commit SHA / environment 正確且不洩漏 secrets。
 - [ ] Camera / rainfall / TDX / CMS API smoke checks。
 - [ ] Snapshot 可用；LIVE 只有手動開啟並可正常停止。
@@ -84,7 +88,7 @@
 - [x] **M19 Passive Camera status**。
 - [x] **M20 Direction-aware road mode**。
 - [x] **M21 Accessibility / interaction hardening**。
-- [ ] **M22 V2 release readiness** — repo RC ready；M22.2 production smoke test blocked by production URL/access。
+- [ ] **M22 V2 release readiness** — repo RC ready；M22.2 blocked only by Vercel `similaitws-projects` scope authorization / production smoke test。
 
 ---
 
