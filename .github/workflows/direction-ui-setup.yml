@@ -1,0 +1,184 @@
+name: One-shot direction UI integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/direction-ui-setup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate-direction-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply exact direction UI transforms
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path, old, new, expected=1):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f'{path}: expected {expected} matches, found {count} for {old!r}')
+              p.write_text(text.replace(old, new))
+
+          page = 'app/page.tsx'
+          replace_exact(
+              page,
+              "import { getDistance } from '@/lib/geo';\nimport { matchesCameraSearch } from '@/lib/camera-search';",
+              "import { buildDirectionOptions, directionMatches, normalizeTravelDirection, type TravelDirection } from '@/lib/directions';\nimport { getDistance } from '@/lib/geo';\nimport { matchesCameraSearch } from '@/lib/camera-search';",
+          )
+          replace_exact(
+              page,
+              "import RoadFilter from '@/components/RoadFilter';\nimport RoadCameraNavigator from '@/components/RoadCameraNavigator';",
+              "import RoadFilter from '@/components/RoadFilter';\nimport DirectionFilter from '@/components/DirectionFilter';\nimport RoadCameraNavigator from '@/components/RoadCameraNavigator';",
+          )
+          replace_exact(
+              page,
+              "  const [selectedRoad, setSelectedRoad] = useState<string | null>(null);\n  const [nearbyRadius, setNearbyRadius] = useState<NearbyRadius | null>(null);",
+              "  const [selectedRoad, setSelectedRoad] = useState<string | null>(null);\n  const [selectedDirection, setSelectedDirection] = useState<TravelDirection | null>(null);\n  const [nearbyRadius, setNearbyRadius] = useState<NearbyRadius | null>(null);",
+          )
+          replace_exact(
+              page,
+              "  const roadGroups = useMemo(() => groupCamerasByRoad(cameras), [cameras]);\n  const mobileRoadNeighbors = useMemo(",
+              "  const roadGroups = useMemo(() => groupCamerasByRoad(cameras), [cameras]);\n  const directionOptions = useMemo(() => {\n    const group = selectedRoad ? roadGroups.find((item) => item.roadNumber === selectedRoad) : undefined;\n    return group ? buildDirectionOptions(group.cameras.map((camera) => camera.direction)) : [];\n  }, [roadGroups, selectedRoad]);\n  const mobileRoadNeighbors = useMemo(",
+          )
+          replace_exact(
+              page,
+              "    setSelectedRoad(params.get('road'));\n    setNearbyRadius(parseNearbyRadius(params.get('nearby')));",
+              "    setSelectedRoad(params.get('road'));\n    const direction = normalizeTravelDirection(params.get('direction'));\n    if (direction) setSelectedDirection(direction);\n    setNearbyRadius(parseNearbyRadius(params.get('nearby')));",
+          )
+          replace_exact(
+              page,
+              "      road: selectedRoad,\n      nearby: nearbyRadius ? String(nearbyRadius) : null,",
+              "      road: selectedRoad,\n      direction: selectedRoad ? selectedDirection : null,\n      nearby: nearbyRadius ? String(nearbyRadius) : null,",
+          )
+          replace_exact(
+              page,
+              "  }, [nearbyRadius, query, selectedRoad, typeFilter, updateUrl, urlReady]);",
+              "  }, [nearbyRadius, query, selectedDirection, selectedRoad, typeFilter, updateUrl, urlReady]);",
+          )
+          replace_exact(
+              page,
+              "  }, [loading, roadGroups, selectedRoad]);\n\n  useEffect(() => {\n    if (!urlReady || loading || cameras.length === 0) return;",
+              "  }, [loading, roadGroups, selectedRoad]);\n\n  useEffect(() => {\n    if (loading) return;\n    if (!selectedRoad) {\n      if (selectedDirection) setSelectedDirection(null);\n      return;\n    }\n    if (selectedDirection && !directionOptions.some((option) => option.value === selectedDirection)) {\n      setSelectedDirection(null);\n    }\n  }, [directionOptions, loading, selectedDirection, selectedRoad]);\n\n  useEffect(() => {\n    if (!urlReady || loading || cameras.length === 0) return;",
+          )
+          replace_exact(
+              page,
+              "  const handleNearbyChange = useCallback((radius: NearbyRadius | null) => {",
+              "  const handleRoadChange = useCallback((road: string | null) => {\n    setSelectedRoad(road);\n    setSelectedDirection(null);\n  }, []);\n\n  const handleNearbyChange = useCallback((radius: NearbyRadius | null) => {",
+          )
+          replace_exact(
+              page,
+              "      if (selectedRoad && getCameraRoadNumber(camera) !== selectedRoad) return false;\n      if (favoritesOnly && !favoriteIdSet.has(camera.id)) return false;",
+              "      if (selectedRoad && getCameraRoadNumber(camera) !== selectedRoad) return false;\n      if (selectedDirection && !directionMatches(selectedDirection, camera.direction)) return false;\n      if (favoritesOnly && !favoriteIdSet.has(camera.id)) return false;",
+          )
+          replace_exact(page, "onSelectRoad={setSelectedRoad}", "onSelectRoad={handleRoadChange}", expected=2)
+          replace_exact(
+              page,
+              "                  <RoadFilter groups={roadGroups} value={selectedRoad} onChange={setSelectedRoad} />\n                  <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} />",
+              "                  <RoadFilter groups={roadGroups} value={selectedRoad} onChange={handleRoadChange} />\n                  <DirectionFilter options={directionOptions} value={selectedDirection} onChange={setSelectedDirection} />\n                  <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} />",
+          )
+          replace_exact(
+              page,
+              "              <RoadFilter groups={roadGroups} value={selectedRoad} onChange={setSelectedRoad} compact />\n              <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} compact />",
+              "              <RoadFilter groups={roadGroups} value={selectedRoad} onChange={handleRoadChange} compact />\n              <DirectionFilter options={directionOptions} value={selectedDirection} onChange={setSelectedDirection} compact />\n              <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} compact />",
+          )
+          replace_exact(
+              page,
+              '                query=""\n                onSelect=',
+              '                query=""\n                direction={selectedDirection ?? undefined}\n                onSelect=',
+              expected=2,
+          )
+
+          map_file = 'components/Map.tsx'
+          replace_exact(
+              map_file,
+              "import { getDistance } from '@/lib/geo';",
+              "import type { TravelDirection } from '@/lib/directions';\nimport { getDistance } from '@/lib/geo';",
+          )
+          replace_exact(
+              map_file,
+              "  query: string;\n  onSelect: (c: Camera) => void;",
+              "  query: string;\n  direction?: TravelDirection;\n  onSelect: (c: Camera) => void;",
+          )
+          replace_exact(
+              map_file,
+              "export default function Map({ cameras, query, onSelect, userLocation }: Props) {",
+              "export default function Map({ cameras, query, direction, onSelect, userLocation }: Props) {",
+          )
+          replace_exact(
+              map_file,
+              "      roadNumber: corridorRoad,\n      cameras,",
+              "      roadNumber: corridorRoad,\n      direction,\n      cameras,",
+          )
+          replace_exact(
+              map_file,
+              "    corridorRoad,\n    flowEnabled,",
+              "    corridorRoad,\n    direction,\n    flowEnabled,",
+          )
+
+          trip = 'components/TripModeSummary.tsx'
+          replace_exact(
+              trip,
+              "import type { Camera } from '@/types/camera';",
+              "import { normalizeTravelDirection, travelDirectionLabel } from '@/lib/directions';\nimport type { Camera } from '@/types/camera';",
+          )
+          replace_exact(
+              trip,
+              "  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');\n\n  useEffect(() => {",
+              "  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');\n  const directionLabel = useMemo(() => {\n    const normalized = normalizeTravelDirection(corridor.direction);\n    return normalized ? travelDirectionLabel(normalized) : corridor.direction?.trim();\n  }, [corridor.direction]);\n\n  useEffect(() => {",
+          )
+          replace_exact(
+              trip,
+              "    const directionText = corridor.direction ? ` ${corridor.direction}` : '';",
+              "    const directionText = directionLabel ? ` ${directionLabel}` : '';",
+          )
+          replace_exact(
+              trip,
+              "{corridor.roadNumber}{corridor.direction ? ` ${corridor.direction}` : ''} 沿線",
+              "{corridor.roadNumber}{directionLabel ? ` ${directionLabel}` : ''} 沿線",
+              expected=2,
+          )
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Regression tests
+        run: npm run test:security
+
+      - name: Production build
+        run: npm run build
+
+      - name: Validate diff
+        run: git diff --check
+
+      - name: Commit direction UI integration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/page.tsx components/Map.tsx components/TripModeSummary.tsx
+          git commit -m "feat: add direction-aware road mode UI"
+          git push origin HEAD:main
