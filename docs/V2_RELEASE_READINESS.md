@@ -6,7 +6,15 @@
 
 **Repo 狀態：Release Candidate ready。**
 
-V2 MVP 的程式碼、security guardrails、regression tests 與 production build 已具備完整 repo-side 證據；但 **Production Release 尚未正式接受**，因目前 Vercel connector 回傳 0 個 team，無法取得本專案 production deployment / environment 狀態，因此 375 / 768 / 1280px 正式站 smoke test、`/api/health` production response、TDX Production env 與實際 Snapshot / LIVE 尚需在 M22.2 驗證。
+V2 MVP 的程式碼、security guardrails、regression tests 與 production build 已具備完整 repo-side 證據；但 **Production Release 尚未正式接受**。
+
+已取得使用者提供的 deployment URL：
+
+`https://taiwan-live-traffic-4xtnqcy76-similaitws-projects.vercel.app/`
+
+Vercel API 能由此網址辨識 team scope `similaitws-projects`，但目前 connected app 對該 scope 回 `403 Not authorized`，並要求重新授權；share / protected deployment fetch 也因同一 scope 權限失敗。這代表目前阻塞已不是「不知道 production URL」，而是「無法取得該 Vercel team scope 的授權與部署資訊」。
+
+此外，此 ChatGPT 執行環境直接解析該 deployment hostname 失敗，因此目前無法以 browser / HTTP fallback 完成 375 / 768 / 1280px 正式站 smoke test、`/api/health` production response、TDX Production env 與實際 Snapshot / LIVE 驗證。
 
 > GitHub CI 成功不等同 production deployment 已成功。本文件刻意把「repo 已驗證」與「正式站待驗證」分開。
 
@@ -31,7 +39,7 @@ V2 MVP 的程式碼、security guardrails、regression tests 與 production buil
 | Proxy allowlist 不退化 | ✅ | `lib/camera-proxy-security.ts` 僅允許官方 Camera hosts / THB pattern；禁止 URL credentials |
 | Redirect 防 SSRF | ✅ | `fetchAllowedCameraResource()` 使用 manual redirect，每跳重新 `parseAllowedCameraUrl()`，最多 4 跳 |
 | Upstream partial failure 仍可用 | ✅ | `/api/cameras` 使用 `Promise.allSettled()`，失敗來源不阻斷已成功來源 |
-| `npm run build` | ✅ | M21 最終正常 CI `34732975943` 全綠 |
+| `npm run build` | ✅ | M21 最終正常 CI `34732975943` 全綠；M22.1 readiness audit CI `34733089266` 亦全綠 |
 
 ---
 
@@ -47,7 +55,7 @@ V2 MVP 的程式碼、security guardrails、regression tests 與 production buil
 
 並使用 GitHub 官方 `checkout@v7.0.1`、`setup-node@v7.0.0`、`cache@v6.1.0` 與 `.next/cache`。
 
-M18 已將 npm audit 清至 **0 vulnerabilities**；其後 package manifest / lockfile 未因 M19–M21 功能修改而變更。
+M18 已將 npm audit 清至 **0 vulnerabilities**；其後 package manifest / lockfile 未因 M19–M22 文件／功能修改而變更。
 
 ---
 
@@ -116,6 +124,7 @@ M21 已完成：
 
 目前 **不可標示已完成**：
 
+- [ ] 確認提供的 deployment URL 是 Production 而非 Preview。
 - [ ] Vercel 最新 Production deployment 對應目前 `main` commit。
 - [ ] Production `TDX_CLIENT_ID` / `TDX_CLIENT_SECRET` 已設定（只確認存在，不讀取值）。
 - [ ] Production `/api/health` HTTP 200，commit SHA 與 main 一致。
@@ -127,7 +136,7 @@ M21 已完成：
 - [ ] 1280px 桌面 smoke test。
 - [ ] 無 TDX credentials 的 graceful degradation smoke test（Preview 或測試環境）。
 
-原因：本次透過已連接的 Vercel app 查詢時，`list_teams` 回傳空陣列，無法安全辨識本專案 production deployment / team；因此不以 GitHub CI 冒充正式站驗證。
+目前唯一已知外部阻塞：Vercel connected app 對 `similaitws-projects` team scope 未授權。重新授權該 scope 後即可繼續 M22.2。
 
 ---
 
