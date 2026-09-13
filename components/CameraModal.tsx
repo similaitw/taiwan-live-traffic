@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Camera } from '@/types/camera';
+import type { Camera, CameraStatus } from '@/types/camera';
+import { usePassiveCameraStatus } from '@/hooks/usePassiveCameraStatus';
 
 const TYPE_LABEL: Record<Camera['type'], string> = {
   freeway: '國道',
@@ -13,6 +14,13 @@ const TYPE_STYLES: Record<Camera['type'], { bg: string; text: string }> = {
   freeway: { bg: 'rgba(59,130,246,0.15)', text: 'var(--accent-freeway)' },
   provincial: { bg: 'rgba(16,185,129,0.15)', text: 'var(--accent-provincial)' },
   county: { bg: 'rgba(245,158,11,0.15)', text: 'var(--accent-county)' },
+};
+
+const PASSIVE_STATUS: Record<CameraStatus, { label: string; color: string; bg: string }> = {
+  online: { label: 'SNAPSHOT OK', color: '#34d399', bg: 'rgba(16,185,129,0.12)' },
+  stale: { label: 'SNAPSHOT STALE', color: '#fbbf24', bg: 'rgba(245,158,11,0.12)' },
+  offline: { label: 'SNAPSHOT UNAVAILABLE', color: '#f87171', bg: 'rgba(239,68,68,0.1)' },
+  unknown: { label: 'SNAPSHOT CHECK', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.04)' },
 };
 
 type SnapshotState = 'loading' | 'ready' | 'error';
@@ -29,6 +37,7 @@ export default function CameraModal({ camera, onClose }: Props) {
   const [liveActive, setLiveActive] = useState(false);
   const [streamState, setStreamState] = useState<StreamState>('idle');
   const [streamKey, setStreamKey] = useState(0);
+  const { observation, markSnapshotSuccess, markSnapshotFailure } = usePassiveCameraStatus(camera);
 
   useEffect(() => {
     setSnapshotState('loading');
@@ -78,6 +87,13 @@ export default function CameraModal({ camera, onClose }: Props) {
     ? `/api/proxy/image?url=${encodeURIComponent(camera.streamUrl)}`
     : null;
   const typeStyle = TYPE_STYLES[camera.type];
+  const passiveStatus = PASSIVE_STATUS[observation.status];
+  const checkedAt = observation.lastCheckedAt
+    ? new Date(observation.lastCheckedAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
+    : undefined;
+  const frameAt = observation.lastFrameAt
+    ? new Date(observation.lastFrameAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
+    : undefined;
 
   const startLive = () => {
     if (!proxyStream) return;
@@ -104,11 +120,9 @@ export default function CameraModal({ camera, onClose }: Props) {
       : streamState === 'error'
         ? { label: 'LIVE ERROR', color: '#f87171', bg: 'rgba(239,68,68,0.1)' }
         : { label: 'CONNECTING', color: '#60a5fa', bg: 'rgba(59,130,246,0.12)' }
-    : snapshotState === 'ready'
-      ? { label: 'SNAPSHOT', color: '#34d399', bg: 'rgba(16,185,129,0.12)' }
-      : snapshotState === 'error'
-        ? { label: 'SOURCE ERROR', color: '#f87171', bg: 'rgba(239,68,68,0.1)' }
-        : { label: 'LOADING', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.04)' };
+    : snapshotState === 'loading' && observation.status === 'unknown'
+      ? PASSIVE_STATUS.unknown
+      : passiveStatus;
 
   return (
     <div
@@ -138,7 +152,12 @@ export default function CameraModal({ camera, onClose }: Props) {
               {TYPE_LABEL[camera.type]}
             </span>
             <h2 className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{camera.name}</h2>
-            <span className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full" style={{ background: status.bg, border: `1px solid ${status.color}55` }} aria-live="polite">
+            <span
+              className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full"
+              style={{ background: status.bg, border: `1px solid ${status.color}55` }}
+              title={!liveActive && checkedAt ? `最後快照檢查 ${checkedAt}` : undefined}
+              aria-live="polite"
+            >
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: status.color, boxShadow: streamState === 'ready' && liveActive ? `0 0 6px ${status.color}` : 'none' }} />
               <span className="text-[9px] font-bold font-mono tracking-wider" style={{ color: status.color }}>{status.label}</span>
             </span>
@@ -163,7 +182,20 @@ export default function CameraModal({ camera, onClose }: Props) {
           ) : (
             <>
               {proxySnapshot && (
-                <img src={proxySnapshot} alt={`${camera.name} 快照`} className="absolute inset-0 w-full h-full object-contain" style={{ zIndex: 1 }} onLoad={() => setSnapshotState('ready')} onError={() => setSnapshotState('error')} />
+                <img
+                  src={proxySnapshot}
+                  alt={`${camera.name} 快照`}
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{ zIndex: 1 }}
+                  onLoad={() => {
+                    setSnapshotState('ready');
+                    markSnapshotSuccess();
+                  }}
+                  onError={() => {
+                    setSnapshotState('error');
+                    markSnapshotFailure();
+                  }}
+                />
               )}
 
               {!proxySnapshot && !liveActive && (
@@ -211,8 +243,10 @@ export default function CameraModal({ camera, onClose }: Props) {
           {camera.road && <span className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}><span style={{ color: 'var(--text-muted)' }}>道路</span> {camera.road}</span>}
           {camera.direction && <span className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}><span style={{ color: 'var(--text-muted)' }}>方向</span> {camera.direction}</span>}
           <span className="text-xs font-mono flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}><span className="font-sans" style={{ color: 'var(--text-muted)' }}>座標</span>{camera.lat.toFixed(5)}, {camera.lng.toFixed(5)}</span>
+          {checkedAt && <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>快照檢查 {checkedAt}</span>}
+          {frameAt && <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>最後畫面 {frameAt}</span>}
           <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>ID: {camera.id}</span>
-          <span className="w-full text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>預設顯示單張快照；直播僅在你手動開啟時才會建立連線，離開頁面或停止直播會立即卸載。</span>
+          <span className="w-full text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>預設顯示單張快照；快照狀態只來自你實際載入過的影像。直播僅在你手動開啟且連線成功時才顯示 LIVE，離開頁面或停止直播會立即卸載。</span>
         </div>
       </div>
     </div>
