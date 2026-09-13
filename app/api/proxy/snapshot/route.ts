@@ -4,12 +4,19 @@ import {
   fetchAllowedCameraResource,
   parseAllowedCameraUrl,
 } from '@/lib/camera-proxy-security';
+import {
+  SNAPSHOT_MAX_BYTES,
+  SnapshotBodyTooLargeError,
+  SnapshotMemoryCache,
+  readResponseBodyWithLimit,
+} from '@/lib/snapshot-resource-limits';
 
 /**
  * Snapshot proxy: fetches a single frame from an image/MJPEG URL.
  * Unlike /api/proxy/image which streams the full response (including MJPEG),
  * this endpoint reads just enough bytes to get one JPEG frame, then closes.
- * Cached for 30 seconds to avoid hammering upstream.
+ * Cached briefly with bounded entries to avoid hammering upstream or growing
+ * process memory without limit.
  */
 
 function concatUint8(arrays: Uint8Array[]): Uint8Array {
@@ -44,8 +51,8 @@ function imageResponse(body: ArrayBuffer | Uint8Array, contentType: string): Res
   });
 }
 
-const snapshotCache = new Map<string, { data: ArrayBuffer; contentType: string; ts: number }>();
-const CACHE_TTL = 30_000;
+const snapshotCache = new SnapshotMemoryCache();
+const SNAPSHOT_TIMEOUT_MS = 8_000;
 
 export async function GET(req: NextRequest) {
   const rawUrl = req.nextUrl.searchParams.get('url');
@@ -63,12 +70,12 @@ export async function GET(req: NextRequest) {
   }
 
   const cached = snapshotCache.get(rawUrl);
-  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+  if (cached) {
     return imageResponse(cached.data, cached.contentType);
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), SNAPSHOT_TIMEOUT_MS);
 
   try {
     const upstream = await fetchAllowedCameraResource(rawUrl, {
@@ -80,8 +87,6 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    clearTimeout(timeout);
-
     if (!upstream.ok) {
       return new Response('Upstream ' + upstream.status, { status: upstream.status });
     }
@@ -89,9 +94,18 @@ export async function GET(req: NextRequest) {
     const contentType = upstream.headers.get('content-type') ?? '';
 
     if (!contentType.includes('multipart') && !contentType.includes('x-mixed-replace')) {
-      const buf = await upstream.arrayBuffer();
-      snapshotCache.set(rawUrl, { data: buf, contentType: contentType || 'image/jpeg', ts: Date.now() });
-      return imageResponse(buf, contentType || 'image/jpeg');
+      if (!upstream.body) {
+        return new Response('No body', { status: 502 });
+      }
+
+      const buf = await readResponseBodyWithLimit(upstream);
+      if (buf.byteLength === 0) {
+        return new Response('No frame captured', { status: 502 });
+      }
+
+      const resolvedContentType = contentType || 'image/jpeg';
+      snapshotCache.set(rawUrl, { data: buf, contentType: resolvedContentType, ts: Date.now() });
+      return imageResponse(buf, resolvedContentType);
     }
 
     const reader = upstream.body?.getReader();
@@ -101,12 +115,18 @@ export async function GET(req: NextRequest) {
 
     const chunks: Uint8Array[] = [];
     let totalLen = 0;
-    const MAX_BYTES = 2 * 1024 * 1024;
 
     try {
-      while (totalLen < MAX_BYTES) {
+      while (totalLen < SNAPSHOT_MAX_BYTES) {
         const { done, value } = await reader.read();
         if (done) break;
+        if (!value) continue;
+
+        if (totalLen + value.length > SNAPSHOT_MAX_BYTES) {
+          await reader.cancel().catch(() => {});
+          return new Response('Snapshot too large', { status: 502 });
+        }
+
         chunks.push(value);
         totalLen += value.length;
 
@@ -117,13 +137,13 @@ export async function GET(req: NextRequest) {
         const end = findBytes(combined, [0xff, 0xd9], start + 2);
         if (end !== -1) {
           const jpeg = combined.slice(start, end + 2);
-          reader.cancel();
+          await reader.cancel().catch(() => {});
           snapshotCache.set(rawUrl, { data: jpeg.buffer, contentType: 'image/jpeg', ts: Date.now() });
           return imageResponse(jpeg, 'image/jpeg');
         }
       }
     } finally {
-      reader.cancel().catch(() => {});
+      await reader.cancel().catch(() => {});
     }
 
     if (chunks.length > 0) {
@@ -133,11 +153,15 @@ export async function GET(req: NextRequest) {
 
     return new Response('No frame captured', { status: 502 });
   } catch (error) {
-    clearTimeout(timeout);
     if (error instanceof CameraProxyUrlError) {
       return new Response(error.message, { status: error.status });
     }
+    if (error instanceof SnapshotBodyTooLargeError) {
+      return new Response('Snapshot too large', { status: 502 });
+    }
     const errMsg = error instanceof Error ? error.message : String(error);
     return new Response('Fetch failed: ' + errMsg, { status: 502 });
+  } finally {
+    clearTimeout(timeout);
   }
 }
