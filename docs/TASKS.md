@@ -8,43 +8,35 @@
 
 ## Current task
 
-### M21.2 — Modal focus workflow polish
+### M22.1 — V2 Definition of Done / release-readiness audit
 
 **Executor: ChatGPT**
 
 目標／範圍：
 
-- [ ] CameraModal 開啟時保存先前 focus，將 focus 移入 dialog。
-- [ ] Modal 開啟期間 Tab / Shift+Tab 不可跑出 `aria-modal` dialog。
-- [ ] Escape / backdrop / 關閉按鈕沿用同一 `onClose` workflow。
-- [ ] Modal 關閉或切換離開後，盡量將 focus 還原到原操作元素；元素已不存在時安全略過。
-- [ ] 手機 Bottom Sheet 維持非 modal，不阻斷地圖互動，不做 focus trap。
-- [ ] 不新增 accessibility 套件，不改 Snapshot / Live lifecycle。
-- [ ] `npm audit`、全部 tests、production build 全部通過。
+- [ ] 逐項核對 `docs/V2_SPEC.md` §21 V2 MVP Definition of Done，引用目前 repo 實作／CI 證據，不靠印象勾選。
+- [ ] 確認正常 CI 仍包含 npm audit、全部 regression tests、production build。
+- [ ] 檢查正式部署所需環境變數／health endpoint／production checklist 是否與目前程式一致。
+- [ ] 若可從已連接的 Vercel 專案取得正式部署狀態，確認 main 最新部署是否成功；無法存取時明確標示未驗證，不冒充完成。
+- [ ] 產出精簡 release-readiness 文件，區分「repo 已驗證」「production 尚待人工/連接驗證」。
+- [ ] 不新增產品功能；只修正本稽核發現的 release blocker。
 
-完成後 M21 Accessibility / interaction hardening 結案。
+完成後若沒有 blocker，V2 可標記 Release Candidate；正式上線 smoke test 另列 M22.2。
 
 ---
 
 ## 近期完成
 
-### M21.1 — Accessibility / reduced-motion audit（完成）
-- [x] Modal、Bottom Sheet、Search suggestions、Map layer panel 皆已支援 Escape 關閉；主要 icon-only buttons 已有 `aria-label`。
-- [x] Camera status / source health 同時提供文字狀態，不依賴顏色單獨傳達資訊。
-- [x] 全站新增 `:focus-visible` 明確 outline。
-- [x] 全站新增 `prefers-reduced-motion: reduce`，壓低非必要 animation / transition。
-- [x] CameraModal 補 `role="dialog"`、`aria-modal="true"`、`aria-labelledby` 與標題 ID。
-- [x] one-shot setup 已移除；最終正常 CI `34732812658` 全綠。
+### M21 — Accessibility / interaction hardening（完成）
+- [x] M21.1：全站 `:focus-visible`、`prefers-reduced-motion`；CameraModal 補 `role="dialog"`、`aria-modal`、標題關聯；主要 icon buttons / status text 稽核完成。CI `34732812658`。
+- [x] M21.2：CameraModal 開啟時保存／移入 focus，Tab / Shift+Tab trap，Escape 沿用關閉 workflow，關閉後還原原操作元素；Bottom Sheet 維持非 modal。Feature commit `1035e65a2b2eceeb407c7fc6cce1e96a40739143`。
+- [x] one-shot setup 已移除；最終正常 CI `34732975943` 全綠。
 
 ### M20 — Direction-aware road mode（完成）
-- [x] M20.1：共用 direction normalization；北向/北上/NB/northbound 等統一 canonical direction；route-corridor 共用 matcher。CI `34730950896`。
-- [x] M20.2：選道路後顯示方向 filter；URL 支援 `direction=north|south|east|west`，換路或無效方向自動清除。
-- [x] Camera 清單／地圖套用同一 direction；缺少 direction metadata 的 Camera 保守保留。
-- [x] Map 將 canonical direction 傳入 `buildRouteCorridor()`，Trip Mode 顯示中文方向但分享網址保留 canonical value。
-- [x] Desktop / mobile 皆可操作；最終正常 CI `34732610626` 全綠。
+- [x] 共用 direction normalization；道路方向 filter；canonical `direction=` URL；Trip Mode 中文顯示／canonical 分享；Desktop / mobile 皆可操作。最終 CI `34732610626`。
 
 ### M19 — Passive Camera status（完成）
-- [x] Card 以實際 snapshot 成敗建立 passive status；Card / Bottom Sheet / Modal 共用 session registry；真正 live `onLoad` 才顯示 LIVE。
+- [x] 實際 snapshot 成敗建立 passive status；Card / Bottom Sheet / Modal 共用 session registry；真正 live `onLoad` 才顯示 LIVE。
 
 ### M18 — Dependency cleanup（完成）
 - [x] 非 breaking `npm audit fix` 後為 **0 vulnerabilities**。
@@ -73,7 +65,8 @@
 - [x] **M18 Dependency cleanup** — 0 npm vulnerabilities。
 - [x] **M19 Passive Camera status**。
 - [x] **M20 Direction-aware road mode**。
-- [ ] **M21 Accessibility / interaction hardening** — M21.2 進行中。
+- [x] **M21 Accessibility / interaction hardening**。
+- [ ] **M22 V2 release readiness** — M22.1 進行中。
 
 ---
 
