@@ -4,19 +4,18 @@
 
 ## 結論
 
-**Repo 狀態：Release Candidate ready。**
+**V2 Production Release accepted。**
 
-V2 MVP 的程式碼、security guardrails、regression tests 與 production build 已具備完整 repo-side 證據；但 **Production Release 尚未正式接受**。
+驗收日期：2026-09-13～2026-09-14（Asia/Taipei）。本機 Vercel CLI 可存取既有 team/project，connector 403 不再阻塞。
 
-已取得使用者提供的 deployment URL：
+- Production：https://taiwan-live-traffic.vercel.app/
+- 驗收 deployment：https://taiwan-live-traffic-oofaoc3qz-similaitws-projects.vercel.app/
+- Deployment：`dpl_D7ym8kK4Wbay2v93kngEnNbov8Nm`，READY / production。
+- 部署／最小修復 SHA：`f0a1f4c0959ffbda7ead8b16ab0c0c819fa22233`（驗收時 main）；後續文件 commit 不改 runtime。
+- 修復：Map 容器建立独立堆疊層，解除 Leaflet 蓋住手機搜尋／篩選／定位控制項。
+- CI `34759241358` audit / regression tests / build 通過；Vercel production build 通過。
 
-`https://taiwan-live-traffic-4xtnqcy76-similaitws-projects.vercel.app/`
-
-Vercel API 能由此網址辨識 team scope `similaitws-projects`，但目前 connected app 對該 scope 回 `403 Not authorized`，並要求重新授權；share / protected deployment fetch 也因同一 scope 權限失敗。這代表目前阻塞已不是「不知道 production URL」，而是「無法取得該 Vercel team scope 的授權與部署資訊」。
-
-此外，此 ChatGPT 執行環境直接解析該 deployment hostname 失敗，因此目前無法以 browser / HTTP fallback 完成 375 / 768 / 1280px 正式站 smoke test、`/api/health` production response、TDX Production env 與實際 Snapshot / LIVE 驗證。
-
-> GitHub CI 成功不等同 production deployment 已成功。本文件刻意把「repo 已驗證」與「正式站待驗證」分開。
+接受範圍依 `docs/CODEX_M22_2.md`：允許 TDX 未配置時的 disabled graceful degradation，不代表 TDX 實際資料已驗證。國道來源無資料仍列後續追蹤。
 
 ---
 
@@ -120,36 +119,30 @@ M21 已完成：
 
 ---
 
-## 6. 尚未驗證：Production acceptance
+## 6. Production acceptance evidence
 
-目前 **不可標示已完成**：
+| 檢查 | 結果 |
+|---|---|
+| Identity | team similaitws-projects、project prj_eClgksBgIni9eIWxpRXbyx4gfqaS；REST metadata production / READY / githubCommitSha 與 health 相符；Git integration production branch=main |
+| Health | 200、ok、production、no-store；不含 credentials，tdx.configured=false |
+| Cameras / rainfall | 200；2,181 cameras，首次 1,335 rainfall stations / source ok；修復後 API 再驗通過 |
+| TDX APIs / CMS | traffic-events、traffic-flow、traffic-sections、cms 全部 200 / enabled=false / disabled；介面顯示需要金鑰，沒有全站 500 |
+| Snapshot | provincial-CCTV-35-0260-042-003：200、image/jpeg、10,683 bytes、JPEG magic ffd8；UI 顯示快照 |
+| LIVE | UI 點開詳情與直播後 naturalWidth=308、狀態 LIVE；停止後 live image=0；預設與 reload 均不自動直播；修復後重驗成功 |
+| 375px | 搜尋／chips／定位可見，Bottom Sheet、圖層開關、雷達與雨量操作正常；stacking 修復後重驗 |
+| 768px | Sidebar / map 無嚴重重疊；搜尋、道路方向、Modal 快照正常 |
+| 1280px | Sidebar / map、快照 Modal；Tab / Shift+Tab 留在 dialog、Escape 關閉 |
+| Search / Road / Direction / Share URL | 42K+230、0K+410 命中；q=0K+410、road=台61、direction=south、camera=provincial-CCTV-11-0610-000-018 reload 後全部還原。已點分享按鈕，clipboard 讀取被系統拒絕；以實際 address-bar URL reload 驗證分享連結 |
+| Nearby | 選 5km 後 URL nearby=5，拒絕 geolocation 時明示 User denied Geolocation，不偽造成功 |
+| Basemap / layers | OSM 無 API KEY REQUIRED；雷達／雨量可切換，TDX unavailable 明示 |
+| Errors | agent-browser errors 無 uncaught error；Vercel 近 1h error logs 查無結果（僅代表查詢區間） |
 
-- [ ] 確認提供的 deployment URL 是 Production 而非 Preview。
-- [ ] Vercel 最新 Production deployment 對應目前 `main` commit。
-- [ ] Production `TDX_CLIENT_ID` / `TDX_CLIENT_SECRET` 已設定（只確認存在，不讀取值）。
-- [ ] Production `/api/health` HTTP 200，commit SHA 與 main 一致。
-- [ ] `/api/cameras` / rainfall / TDX APIs production smoke checks。
-- [ ] 一支允許來源 Camera Snapshot 可用。
-- [ ] 手動 LIVE 開啟／停止 lifecycle 可用。
-- [ ] 375px 手機 smoke test。
-- [ ] 768px 平板 smoke test。
-- [ ] 1280px 桌面 smoke test。
-- [ ] 無 TDX credentials 的 graceful degradation smoke test（Preview 或測試環境）。
-
-目前唯一已知外部阻塞：Vercel connected app 對 `similaitws-projects` team scope 未授權。重新授權該 scope 後即可繼續 M22.2。
-
----
+截圖保留於本機 TEMP（m22-fixed-375.png、m22-fixed-sheet.png、m22-768-main.png、m22-768-detail.png、m22-1280-main.png），不提交二進位檔。
 
 ## 7. Release decision
 
-### V2 Release Candidate
+**V2 Production Release：accepted。**
 
-**✅ 可標記 RC。**
+已完成 M22.2 指定的 deployment、API、Snapshot/LIVE 與三種 viewport 實際驗收，並以最小修復解除手機 controls 遮蔽問題。
 
-Repo-side Definition of Done、build / test / dependency gate、proxy security、resource limits、passive status、road direction mode 與 accessibility hardening 均已完成。
-
-### Production Release
-
-**⏳ 尚待 M22.2 production smoke test。**
-
-正式接受 release 前仍需完成 `docs/PRODUCTION_CHECKLIST.md` 的 production deployment / environment / browser smoke checks。
+後續追蹤：TDX credentials 仍缺；國道／縣市來源無資料；OSM best-effort 可用性。進階功能另開任務。

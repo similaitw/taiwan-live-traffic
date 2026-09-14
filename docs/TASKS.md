@@ -8,50 +8,34 @@
 
 ## Current task
 
-### M22.2 — Production deployment / browser smoke test
-
-**Executor: Codex**
-
-**原因：此任務需要本機 Vercel CLI / agent-browser，ChatGPT 目前的 Vercel connector 對 `similaitws-projects` team scope 仍無法可靠存取。**
-
-Codex 執行前必讀：`docs/CODEX_M22_2.md`
-
-正式網址：
-
-`https://taiwan-live-traffic-4xtnqcy76-similaitws-projects.vercel.app/`
-
-已知狀態：
-
-- Vercel API 能由網址辨識 team scope 為 `similaitws-projects`，但 ChatGPT connector 一直無法可靠授權該 scope。
-- `docs/TASKS.md` 已記錄本機 Vercel CLI 可使用 production scope；connector 403 不代表 deployment 失敗。
-- GitHub `main` 最新重要 hotfix：`d6e910307e23f05bb721308739d301da75abeb56`，已改用 OpenStreetMap basemap。
-- 該 hotfix CI `34757186602` 已成功。
-- Repo-side V2 已是 Release Candidate；M22.2 是 Production acceptance 最後一步。
-
-Codex 必須優先使用 skills：
-
-- `vercel-api`：project / deployment / env presence / logs；若 connector 不通，依 skill 改走本機 Vercel CLI / REST fallback。
-- `agent-browser`：最新 production URL 的 375 / 768 / 1280px 瀏覽器 smoke test與互動驗收。
-
-完成條件與禁止事項全部寫在 `docs/CODEX_M22_2.md`；不要重新設計產品、不要新增功能、不要建立第二個 Vercel project。
-
-完成後：
-
-- [ ] 確認 production deployment identity / commit。
-- [ ] production `/api/health` 200 且不洩漏 secrets。
-- [ ] Camera / rainfall / TDX / CMS API smoke tests。
-- [ ] Snapshot 可用；LIVE 由 UI 手動開啟／停止。
-- [ ] 375px / 768px / 1280px browser smoke test。
-- [ ] Search / Road / Direction / Share URL restore。
-- [ ] Basemap 不再出現 `API KEY REQUIRED`。
-- [ ] 更新 `docs/TASKS.md` 與 `docs/V2_RELEASE_READINESS.md`。
-- [ ] 必要修復已 commit / push main，並確認 CI。
-
-完成後才能把 Production Release 標記 accepted。
+M22.2 已完成。下一個進階功能任務待確認範圍；建議優先處理國道來源可靠性，再安排收藏群組／多畫面監看。
 
 ---
 
 ## 近期完成
+
+### M22.2 — Production deployment / browser smoke test（完成）
+
+Executor: Codex；驗收日期：2026-09-13～2026-09-14（Asia/Taipei）。
+
+- Production：https://taiwan-live-traffic.vercel.app/
+- 驗收 deployment：https://taiwan-live-traffic-oofaoc3qz-similaitws-projects.vercel.app/
+- Deployment ID：`dpl_D7ym8kK4Wbay2v93kngEnNbov8Nm`；READY / production。
+- 部署與修復 commit：`f0a1f4c0959ffbda7ead8b16ab0c0c819fa22233`（驗收時 main）；後續文件 commit 僅記錄結果。
+- [x] CLI / REST metadata 與 health 確認 team、project、production、SHA；未建立新 project。
+- [x] Health 200 / ok / production / no-store；未輸出 credentials。
+- [x] Cameras 200（2,181 筆）；rainfall 200 / ok（首次 1,335 站）；TDX 四個 API 全部 200 / disabled。
+- [x] 合法 Camera snapshot 200 / image/jpeg / JPEG magic；UI 快照可用。
+- [x] UI 手動 LIVE 成功，收到 308px 寬影像；停止後 live image 元素數歸零；預設與 URL restore 不啟動 LIVE。
+- [x] 375px mobile / Bottom Sheet / layers；768px sidebar / detail；1280px sidebar / modal / Tab / Shift+Tab / Escape 實測。
+- [x] Search、台61 / south / camera URL reload 還原；Nearby 5km 被拒定位時明示錯誤。
+- [x] OSM 無 API KEY REQUIRED；雨量／雷達正常，TDX 圖層明示未啟用。
+- [x] 最小修復：Map 容器加 isolate / z-0，解除手機控制項被地圖蓋住；production 重驗通過。
+- [x] 修復 CI `34759241358` audit / regression tests / build 通過，Vercel build 通過；browser errors 無 uncaught error，近 1h Vercel error logs 無結果。
+- **V2 Production Release accepted**，依 M22.2 允許 TDX disabled 的驗收條件。
+- 已知限制：TDX 兩項憑證未設定；國道／縣市目前無資料，公路來源正常。進階功能另開任務。
+
+
 
 ### 底圖顯示 hotfix
 - [x] 依使用者回報修正 CARTO 圖磚顯示 API KEY REQUIRED：改用 OpenStreetMap 標準圖磚並保留來源標示。
@@ -102,7 +86,7 @@ Codex 必須優先使用 skills：
 - [x] **M19 Passive Camera status**。
 - [x] **M20 Direction-aware road mode**。
 - [x] **M21 Accessibility / interaction hardening**。
-- [ ] **M22 V2 release readiness** — repo RC ready；M22.2 交由 Codex 使用 Vercel/agent-browser skills 完成 Production acceptance。
+- [x] **M22 V2 release readiness** — Production accepted，詳見 M22.2 驗收紀錄。
 
 ---
 
