@@ -32,6 +32,7 @@ interface Props {
   direction?: TravelDirection;
   onSelect: (c: Camera) => void;
   userLocation?: { lat: number; lng: number } | null;
+  activeCameraId?: string;
 }
 
 interface StoredLayerPreferences {
@@ -99,7 +100,7 @@ function sourceDetail(status: ApiSourceStatus, partialDetail?: string): string |
   return undefined;
 }
 
-export default function Map({ cameras, query, direction, onSelect, userLocation }: Props) {
+export default function Map({ cameras, query, direction, onSelect, userLocation, activeCameraId }: Props) {
   const [trafficEvents, setTrafficEvents] = useState<TrafficEvent[]>([]);
   const [trafficEnabled, setTrafficEnabled] = useState(false);
   const [eventsHealth, setEventsHealth] = useState<LayerHealth>({ status: 'loading', provider: 'TDX' });
@@ -444,6 +445,7 @@ export default function Map({ cameras, query, direction, onSelect, userLocation 
         cmsPreferredCameraIds={cmsPreferredCameraIds}
         rainfallStations={showRainfall ? filteredRainfallStations : []}
         radarImageUrl={radarImageUrl}
+        activeCameraId={activeCameraId}
       />
 
       {routeCorridor && <TripModeSummary corridor={routeCorridor} />}

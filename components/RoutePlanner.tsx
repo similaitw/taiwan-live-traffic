@@ -5,6 +5,7 @@ import DirectionFilter from '@/components/DirectionFilter';
 import NearbyFilter, { type NearbyRadius } from '@/components/NearbyFilter';
 import type { DirectionOption, TravelDirection } from '@/lib/directions';
 import type { RoadGroup } from '@/lib/roads';
+import SkinSwitcher from '@/components/SkinSwitcher';
 import {
   MAX_ROUTE_STOPS,
   buildGoogleMapsDirectionsUrl,
@@ -76,13 +77,14 @@ export default function RoutePlanner({
     <section
       className={`rounded-2xl ${compact ? 'glass p-2 shadow-2xl' : 'p-3'}`}
       style={compact ? undefined : {
-        background: 'rgba(255,255,255,0.035)',
+        background: 'var(--surface-soft)',
         border: '1px solid var(--border-subtle)',
       }}
       aria-label="路況模式"
     >
-      <div className="grid grid-cols-3 gap-1 rounded-xl p-1"
-        style={{ background: 'rgba(255,255,255,0.04)' }}>
+      <div className="flex items-center gap-2">
+        <div className="grid flex-1 grid-cols-3 gap-1 rounded-xl p-1"
+          style={{ background: 'var(--surface-soft)' }}>
         {MODES.map((item) => {
           const active = mode === item.value;
           return (
@@ -103,6 +105,8 @@ export default function RoutePlanner({
             </button>
           );
         })}
+        </div>
+        <SkinSwitcher compact={compact} />
       </div>
 
       {mode === 'route' && (
@@ -125,7 +129,7 @@ export default function RoutePlanner({
                 onClick={() => removeVia(index)}
                 aria-label={`移除途經點 ${index + 1}`}
                 className="mt-4 h-9 w-9 rounded-lg text-sm font-bold"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}
+                style={{ background: 'var(--surface-soft)', color: 'var(--text-muted)' }}
               >
                 ×
               </button>
@@ -139,7 +143,7 @@ export default function RoutePlanner({
                 onClick={() => onRouteViaChange([...routeVia, ''])}
                 className="min-h-9 rounded-lg px-3 text-[11px] font-bold"
                 style={{
-                  background: 'rgba(255,255,255,0.05)',
+                  background: 'var(--surface-soft)',
                   color: 'var(--text-secondary)',
                   border: '1px solid var(--border-subtle)',
                 }}
@@ -228,7 +232,7 @@ function RouteInput({
         placeholder={placeholder}
         className="h-9 w-full rounded-lg px-2.5 text-xs font-bold outline-none"
         style={{
-          background: 'rgba(255,255,255,0.055)',
+          background: 'var(--surface-soft)',
           color: 'var(--text-primary)',
           border: '1px solid var(--border-subtle)',
         }}

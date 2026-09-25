@@ -89,11 +89,11 @@ function rainfallLabel(amount?: number): string {
   return String(Math.round(amount));
 }
 
-function makeIcon(type: Camera['type']): L.DivIcon {
+function makeIcon(type: Camera['type'], active = false): L.DivIcon {
   const color = COLORS[type];
   return L.divIcon({
     className: '',
-    html: `<svg width="24" height="32" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg"><defs><filter id="glow-${type}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="blur"/><feFlood flood-color="${color}" flood-opacity="0.4" result="color"/><feComposite in="color" in2="blur" operator="in" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path d="M12 0C5.373 0 0 5.373 0 12c0 8 12 20 12 20S24 20 24 12C24 5.373 18.627 0 12 0z" fill="${color}" stroke="rgba(255,255,255,0.3)" stroke-width="1" filter="url(#glow-${type})"/><circle cx="12" cy="12" r="4" fill="rgba(255,255,255,0.9)"/></svg>`,
+    html: `<div style="position:relative;width:24px;height:32px">${active ? '<span style="position:absolute;left:-6px;top:-5px;width:36px;height:36px;border-radius:9999px;border:3px solid rgba(255,255,255,.92);box-shadow:0 0 0 6px rgba(59,130,246,.25),0 0 28px rgba(59,130,246,.75)"></span>' : ''}<svg width="24" height="32" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg"><defs><filter id="glow-${type}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="blur"/><feFlood flood-color="${color}" flood-opacity="0.4" result="color"/><feComposite in="color" in2="blur" operator="in" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path d="M12 0C5.373 0 0 5.373 0 12c0 8 12 20 12 20S24 20 24 12C24 5.373 18.627 0 12 0z" fill="${color}" stroke="rgba(255,255,255,0.3)" stroke-width="1" filter="url(#glow-${type})"/><circle cx="12" cy="12" r="4" fill="rgba(255,255,255,0.9)"/></svg></div>`,
     iconSize: [24, 32], iconAnchor: [12, 32], popupAnchor: [0, -34],
   });
 }
@@ -216,9 +216,10 @@ interface Props {
   cmsPreferredCameraIds?: Record<string, string>;
   rainfallStations?: RainfallStation[];
   radarImageUrl?: string;
+  activeCameraId?: string;
 }
 
-export default function MapInner({ cameras, query, onSelect, userLocation, trafficEvents = [], trafficFlowSegments = [], cmsDevices = [], cmsPreferredCameraIds = {}, rainfallStations = [], radarImageUrl }: Props) {
+export default function MapInner({ cameras, query, onSelect, userLocation, trafficEvents = [], trafficFlowSegments = [], cmsDevices = [], cmsPreferredCameraIds = {}, rainfallStations = [], radarImageUrl, activeCameraId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const cameraLayerRef = useRef<L.LayerGroup | null>(null);
@@ -270,6 +271,14 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !activeCameraId) return;
+    const camera = cameras.find((item) => item.id === activeCameraId);
+    if (!camera) return;
+    map.flyTo([camera.lat, camera.lng], Math.max(map.getZoom(), 15), { animate: true, duration: 0.65 });
+  }, [activeCameraId, cameras]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
     if (radarOverlayRef.current) {
       map.removeLayer(radarOverlayRef.current);
@@ -297,7 +306,12 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
     const map = mapRef.current; const layer = cameraLayerRef.current;
     if (!map || !layer) return;
     const createCameraMarker = (camera: Camera): L.Marker => {
-      const marker = L.marker([camera.lat, camera.lng], { icon: makeIcon(camera.type), zIndexOffset: 1000, title: camera.name });
+      const active = camera.id === activeCameraId;
+      const marker = L.marker([camera.lat, camera.lng], {
+        icon: makeIcon(camera.type, active),
+        zIndexOffset: active ? 2400 : 1000,
+        title: camera.name,
+      });
       const color = COLORS[camera.type];
       const preview = `<div style="width:200px;font-family:'Noto Sans TC',sans-serif"><div style="position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#0a0e1a;margin-bottom:8px;border-radius:8px;border:1px solid rgba(255,255,255,.06)"><img src="/api/proxy/snapshot?url=${encodeURIComponent(camera.snapshotUrl ?? camera.streamUrl)}" alt="${escapeHtml(camera.name)}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/></div><div style="padding:0 2px"><div style="font-weight:700;color:#e8ecf4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;margin-bottom:4px">${escapeHtml(camera.name)}</div><div style="color:#4b5563;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:8px;font-family:'JetBrains Mono',monospace">${escapeHtml(camera.road ?? '—')}</div><div style="padding-top:8px;border-top:1px solid rgba(255,255,255,.06);color:${color};font-size:10px;font-weight:700;text-align:center">點擊查看</div></div></div>`;
       const popup = L.popup({ maxWidth: 220, className: 'leaflet-camera-preview' }).setContent(preview);
@@ -310,7 +324,7 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
       const visible = cameras.filter((camera) => bounds.contains([camera.lat, camera.lng]) && (!query || camera.name.toLowerCase().includes(q) || camera.id.toLowerCase().includes(q) || (camera.road?.toLowerCase().includes(q) ?? false)));
       const zoom = map.getZoom(); const clusters = clusterCameras(map, visible, zoom); const next = new Set<string>();
       for (const cluster of clusters) {
-        const signature = clusterSignature(cluster); next.add(cluster.key); const existing = renderedMarkersRef.current.get(cluster.key); if (existing?.signature === signature) continue; if (existing) layer.removeLayer(existing.marker);
+        const signature = `${clusterSignature(cluster)}|active:${cluster.cameras.some((camera) => camera.id === activeCameraId) ? '1' : '0'}`; next.add(cluster.key); const existing = renderedMarkersRef.current.get(cluster.key); if (existing?.signature === signature) continue; if (existing) layer.removeLayer(existing.marker);
         const marker = cluster.cameras.length > 1 ? L.marker([cluster.lat, cluster.lng], { icon: makeClusterIcon(cluster.cameras.length), zIndexOffset: 800, title: `${cluster.cameras.length} 支監視器` }) : createCameraMarker(cluster.cameras[0]!);
         if (cluster.cameras.length > 1) marker.on('click', () => map.setView([cluster.lat, cluster.lng], Math.min(zoom + 2, 16), { animate: true, duration: 0.6 }));
         marker.addTo(layer); renderedMarkersRef.current.set(cluster.key, { marker, signature });
@@ -320,7 +334,7 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
     const schedule = () => { if (cameraFrameRef.current !== null) cancelAnimationFrame(cameraFrameRef.current); cameraFrameRef.current = requestAnimationFrame(() => { cameraFrameRef.current = null; render(); }); };
     schedule(); map.on('moveend', schedule); map.on('zoomend', schedule);
     return () => { map.off('moveend', schedule); map.off('zoomend', schedule); if (cameraFrameRef.current !== null) cancelAnimationFrame(cameraFrameRef.current); };
-  }, [cameras, query, onSelect]);
+  }, [activeCameraId, cameras, query, onSelect]);
 
   useEffect(() => {
     const map = mapRef.current; const layer = rainfallLayerRef.current;

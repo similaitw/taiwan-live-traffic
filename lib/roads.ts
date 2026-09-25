@@ -50,7 +50,7 @@ function roadSortKey(roadNumber: string): [number, number, number] {
   return [prefix, number, branch];
 }
 
-function mileValue(camera: Camera): number {
+export function cameraMileValue(camera: Camera): number {
   if (typeof camera.mile === 'number') {
     return Number.isFinite(camera.mile) ? camera.mile : Number.POSITIVE_INFINITY;
   }
@@ -63,12 +63,12 @@ function mileValue(camera: Camera): number {
   return decimal ? Number(decimal[0]) : Number.POSITIVE_INFINITY;
 }
 
-function sortRoadCameras(cameras: Camera[]): Camera[] {
+export function sortRoadCameras(cameras: Camera[]): Camera[] {
   return [...cameras].sort((a, b) => {
-    const mileDifference = mileValue(a) - mileValue(b);
+    const mileDifference = cameraMileValue(a) - cameraMileValue(b);
     if (Number.isFinite(mileDifference) && mileDifference !== 0) return mileDifference;
-    if (Number.isFinite(mileValue(a)) !== Number.isFinite(mileValue(b))) {
-      return Number.isFinite(mileValue(a)) ? -1 : 1;
+    if (Number.isFinite(cameraMileValue(a)) !== Number.isFinite(cameraMileValue(b))) {
+      return Number.isFinite(cameraMileValue(a)) ? -1 : 1;
     }
     return a.name.localeCompare(b.name, 'zh-Hant', { numeric: true }) || a.id.localeCompare(b.id);
   });

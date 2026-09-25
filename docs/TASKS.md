@@ -14,13 +14,16 @@
 
 目標：先用現有可靠的道路／方向／里程資料建立「沿線 CCTV 播放序列」，不宣稱是 Google 導航路線。
 
-- [ ] 抽出共用 Camera sequence：道路 + 方向 + 里程排序。
-- [ ] Road mode 直接得到穩定 sequence，提供 current / previous / next。
-- [ ] Route mode 建立可組合的 corridor model，為後續多道路 route segments 預留。
-- [ ] Map 與目前 sequence camera 可同步 focus。
-- [ ] URL 可保存 sequence current camera，舊 V2 camera URL 相容。
-- [ ] 補 regression tests。
+- [x] 抽出共用 Camera sequence：道路 + 方向 + 里程排序。
+- [x] Road mode 直接得到穩定 sequence，提供 current / previous / next。
+- [x] Route mode 建立可組合的 corridor segment / sequence model，為後續多道路 route segments 預留。
+- [x] Map 與目前 sequence camera 同步 focus / highlight。
+- [x] URL 用 `play=` 保存 sequence current camera；既有 `camera=` detail URL 保持相容。
+- [x] 沿線播放器加入多點橫向排列、Snapshot autoplay 預設 ON、3/5/10 秒切換；LIVE 仍手動。
+- [x] 新增 4 套持久化 Skins：黑曜／海灣／森林／暮紫。
+- [x] 補 camera-sequence regression tests。
 - [ ] CI audit / tests / build 通過。
+- [ ] Production 部署與 375 / 768 / 1280 smoke test。
 
 ---
 
@@ -114,7 +117,7 @@ Executor: Codex；驗收日期：2026-09-13～2026-09-14（Asia/Taipei）。
 - [x] **M20 Direction-aware road mode**。
 - [x] **M21 Accessibility / interaction hardening**。
 - [x] **M22 V2 release readiness** — Production accepted，詳見 M22.2 驗收紀錄。
-- [ ] **V3 路線型即時監控地圖** — V3.1 完成；V3.2 開發中。
+- [ ] **V3 路線型即時監控地圖** — V3.1 完成；V3.2 + autoplay + skins 開發中。
 
 ---
 

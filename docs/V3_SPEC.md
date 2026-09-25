@@ -137,3 +137,8 @@ V3.3：
 ### V3.8 Responsive Polish
 - 375 / 768 / 1280+ smoke test。
 - accessibility / reduced motion / keyboard。
+
+
+## 8. Skins
+
+V3 提供持久化 Skin 切換，預設「黑曜」：黑曜／海灣／森林／暮紫。Skin 使用 CSS variables + `data-skin`，存在 localStorage，不影響資料與分享 URL。

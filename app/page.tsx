@@ -20,6 +20,8 @@ import RoadCameraNavigator from '@/components/RoadCameraNavigator';
 import NearbyFilter, { type NearbyRadius } from '@/components/NearbyFilter';
 import Map from '@/components/Map';
 import RoutePlanner from '@/components/RoutePlanner';
+import CorridorPlayer from '@/components/CorridorPlayer';
+import { buildRoadCameraSequence } from '@/lib/camera-sequence';
 import { normalizeTrafficMode, parseRouteViaParam, serializeRouteViaParam, type TrafficMode } from '@/lib/route-plan';
 
 type View = 'map' | 'list';
@@ -70,6 +72,7 @@ export default function HomePage() {
   const [routeFrom, setRouteFrom] = useState('');
   const [routeTo, setRouteTo] = useState('');
   const [routeVia, setRouteVia] = useState<string[]>([]);
+  const [sequenceCameraId, setSequenceCameraId] = useState<string | null>(null);
   const [urlReady, setUrlReady] = useState(false);
   const pendingCameraIdRef = useRef<string | null>(null);
   const restoredCameraIdRef = useRef<string | null>(null);
@@ -86,6 +89,14 @@ export default function HomePage() {
     const group = selectedRoad ? roadGroups.find((item) => item.roadNumber === selectedRoad) : undefined;
     return group ? buildDirectionOptions(group.cameras.map((camera) => camera.direction)) : [];
   }, [roadGroups, selectedRoad]);
+  const roadSequence = useMemo(
+    () => (
+      trafficMode === 'road' && selectedRoad
+        ? buildRoadCameraSequence(cameras, selectedRoad, selectedDirection)
+        : null
+    ),
+    [cameras, selectedDirection, selectedRoad, trafficMode],
+  );
   const mobileRoadNeighbors = useMemo(
     () => (mobileSelected ? getRoadNeighbors(cameras, mobileSelected) : null),
     [cameras, mobileSelected]
@@ -106,6 +117,16 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    if (!roadSequence || roadSequence.cameras.length === 0) {
+      if (sequenceCameraId) setSequenceCameraId(null);
+      return;
+    }
+    if (!sequenceCameraId || !roadSequence.cameras.some((camera) => camera.id === sequenceCameraId)) {
+      setSequenceCameraId(roadSequence.cameras[0]!.id);
+    }
+  }, [roadSequence, sequenceCameraId]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setQuery(params.get('q') ?? '');
     const type = params.get('type');
@@ -120,6 +141,7 @@ export default function HomePage() {
     setRouteFrom(params.get('from') ?? '');
     setRouteTo(params.get('to') ?? '');
     setRouteVia(parseRouteViaParam(params.get('via')));
+    setSequenceCameraId(params.get('play'));
     pendingCameraIdRef.current = params.get('camera');
     setUrlReady(true);
   }, []);
@@ -147,8 +169,9 @@ export default function HomePage() {
       road: trafficMode === 'road' ? selectedRoad : null,
       direction: trafficMode === 'road' && selectedRoad ? selectedDirection : null,
       nearby: trafficMode === 'nearby' && nearbyRadius ? String(nearbyRadius) : null,
+      play: trafficMode === 'road' ? sequenceCameraId : null,
     });
-  }, [nearbyRadius, query, routeFrom, routeTo, routeVia, selectedDirection, selectedRoad, trafficMode, typeFilter, updateUrl, urlReady]);
+  }, [nearbyRadius, query, routeFrom, routeTo, routeVia, selectedDirection, selectedRoad, sequenceCameraId, trafficMode, typeFilter, updateUrl, urlReady]);
 
   useEffect(() => {
     if (loading || !selectedRoad || roadGroups.length === 0) return;
@@ -227,6 +250,7 @@ export default function HomePage() {
     setTrafficMode('road');
     setSelectedRoad(road);
     setSelectedDirection(null);
+    setSequenceCameraId(null);
   }, []);
 
   const handleNearbyChange = useCallback((radius: NearbyRadius | null) => {
@@ -237,8 +261,18 @@ export default function HomePage() {
 
   const handleTrafficModeChange = useCallback((mode: TrafficMode) => {
     setTrafficMode(mode);
+    if (mode !== 'road') setSequenceCameraId(null);
     if (mode === 'nearby' && nearbyRadius && !userLocation) locateMe();
   }, [locateMe, nearbyRadius, userLocation]);
+
+  const handleSequenceActiveChange = useCallback((camera: Camera) => {
+    setSequenceCameraId(camera.id);
+  }, []);
+
+  const handleSequenceInspect = useCallback((camera: Camera) => {
+    if (window.matchMedia('(max-width: 767px)').matches) handleMobileSelect(camera);
+    else handleDesktopSelect(camera);
+  }, [handleDesktopSelect, handleMobileSelect]);
 
   const favoriteIdSet = new Set(favoriteIds);
   const recentIdSet = new Set(recentIds);
@@ -379,7 +413,7 @@ export default function HomePage() {
             <aside
               className="w-[340px] xl:w-[380px] shrink-0 h-full flex flex-col"
               style={{
-                background: 'rgba(10,14,26,0.94)',
+                background: 'var(--panel-bg)',
                 borderRight: '1px solid var(--border-subtle)',
                 boxShadow: '12px 0 30px rgba(0,0,0,0.18)',
               }}
@@ -504,6 +538,7 @@ export default function HomePage() {
                 direction={trafficMode === 'road' ? selectedDirection ?? undefined : undefined}
                 onSelect={handleDesktopSelect}
                 userLocation={userLocation}
+                activeCameraId={roadSequence ? sequenceCameraId ?? undefined : undefined}
               />
             </section>
           </div>
@@ -625,6 +660,15 @@ export default function HomePage() {
             )}
           </div>
         </>
+      )}
+
+      {roadSequence && roadSequence.cameras.length > 0 && (
+        <CorridorPlayer
+          sequence={roadSequence}
+          activeCameraId={sequenceCameraId}
+          onActiveChange={handleSequenceActiveChange}
+          onInspect={handleSequenceInspect}
+        />
       )}
 
       <CameraBottomSheet
