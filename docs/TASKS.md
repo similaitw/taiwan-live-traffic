@@ -8,7 +8,21 @@
 
 ## Current task
 
-M22.2 已完成。下一個進階功能任務待確認範圍；建議優先處理國道來源可靠性，再安排收藏群組／多畫面監看。
+### V3.1 — Route UX Foundation
+
+**Executor: ChatGPT**
+
+- [x] 建立 V3 product spec，改以「路線上的即時監控播放器」為核心。
+- [x] 新增 Route / Road / Nearby 三模式；Route 為新版預設。
+- [x] Route 支援起點、終點、最多 8 個途經點。
+- [x] 新增免 API Key 的 Google Maps Directions URL launcher。
+- [x] 新增 `mode / from / to / via` URL restore / share foundation，並相容既有 road / nearby URL。
+- [x] Desktop sidebar、mobile floating controls 重排；Tablet 沿用 sidebar + map breakpoint。
+- [x] 隱藏模式不再持續套用 road / nearby filter，避免模式切換後結果被舊條件暗中縮小。
+- [x] 新增 route-plan regression tests。
+- [ ] GitHub Actions audit / regression tests / production build 通過。
+
+完成後進 V3.2：Route Corridor → 沿途 CCTV sequence。
 
 ---
 
@@ -87,6 +101,7 @@ Executor: Codex；驗收日期：2026-09-13～2026-09-14（Asia/Taipei）。
 - [x] **M20 Direction-aware road mode**。
 - [x] **M21 Accessibility / interaction hardening**。
 - [x] **M22 V2 release readiness** — Production accepted，詳見 M22.2 驗收紀錄。
+- [ ] **V3 路線型即時監控地圖** — V3.1 開發中。
 
 ---
 

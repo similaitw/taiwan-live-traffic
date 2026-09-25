@@ -19,6 +19,8 @@ import DirectionFilter from '@/components/DirectionFilter';
 import RoadCameraNavigator from '@/components/RoadCameraNavigator';
 import NearbyFilter, { type NearbyRadius } from '@/components/NearbyFilter';
 import Map from '@/components/Map';
+import RoutePlanner from '@/components/RoutePlanner';
+import { normalizeTrafficMode, parseRouteViaParam, serializeRouteViaParam, type TrafficMode } from '@/lib/route-plan';
 
 type View = 'map' | 'list';
 
@@ -64,6 +66,10 @@ export default function HomePage() {
   const [sortByNearest, setSortByNearest] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [recentOnly, setRecentOnly] = useState(false);
+  const [trafficMode, setTrafficMode] = useState<TrafficMode>('route');
+  const [routeFrom, setRouteFrom] = useState('');
+  const [routeTo, setRouteTo] = useState('');
+  const [routeVia, setRouteVia] = useState<string[]>([]);
   const [urlReady, setUrlReady] = useState(false);
   const pendingCameraIdRef = useRef<string | null>(null);
   const restoredCameraIdRef = useRef<string | null>(null);
@@ -104,10 +110,16 @@ export default function HomePage() {
     setQuery(params.get('q') ?? '');
     const type = params.get('type');
     if (validCameraType(type)) setTypeFilter(type);
-    setSelectedRoad(params.get('road'));
+    const restoredRoad = params.get('road');
+    const restoredNearby = parseNearbyRadius(params.get('nearby'));
+    setSelectedRoad(restoredRoad);
     const direction = normalizeTravelDirection(params.get('direction'));
     if (direction) setSelectedDirection(direction);
-    setNearbyRadius(parseNearbyRadius(params.get('nearby')));
+    setNearbyRadius(restoredNearby);
+    setTrafficMode(normalizeTrafficMode(params.get('mode')) ?? (restoredRoad ? 'road' : restoredNearby ? 'nearby' : 'route'));
+    setRouteFrom(params.get('from') ?? '');
+    setRouteTo(params.get('to') ?? '');
+    setRouteVia(parseRouteViaParam(params.get('via')));
     pendingCameraIdRef.current = params.get('camera');
     setUrlReady(true);
   }, []);
@@ -126,13 +138,17 @@ export default function HomePage() {
   useEffect(() => {
     if (!urlReady) return;
     updateUrl({
+      mode: trafficMode,
+      from: trafficMode === 'route' ? routeFrom.trim() || null : null,
+      to: trafficMode === 'route' ? routeTo.trim() || null : null,
+      via: trafficMode === 'route' ? serializeRouteViaParam(routeVia) : null,
       q: query.trim() || null,
       type: typeFilter === 'all' ? null : typeFilter,
-      road: selectedRoad,
-      direction: selectedRoad ? selectedDirection : null,
-      nearby: nearbyRadius ? String(nearbyRadius) : null,
+      road: trafficMode === 'road' ? selectedRoad : null,
+      direction: trafficMode === 'road' && selectedRoad ? selectedDirection : null,
+      nearby: trafficMode === 'nearby' && nearbyRadius ? String(nearbyRadius) : null,
     });
-  }, [nearbyRadius, query, selectedDirection, selectedRoad, typeFilter, updateUrl, urlReady]);
+  }, [nearbyRadius, query, routeFrom, routeTo, routeVia, selectedDirection, selectedRoad, trafficMode, typeFilter, updateUrl, urlReady]);
 
   useEffect(() => {
     if (loading || !selectedRoad || roadGroups.length === 0) return;
@@ -208,14 +224,21 @@ export default function HomePage() {
   );
 
   const handleRoadChange = useCallback((road: string | null) => {
+    setTrafficMode('road');
     setSelectedRoad(road);
     setSelectedDirection(null);
   }, []);
 
   const handleNearbyChange = useCallback((radius: NearbyRadius | null) => {
+    setTrafficMode('nearby');
     setNearbyRadius(radius);
     if (radius && !userLocation) locateMe();
   }, [locateMe, userLocation]);
+
+  const handleTrafficModeChange = useCallback((mode: TrafficMode) => {
+    setTrafficMode(mode);
+    if (mode === 'nearby' && nearbyRadius && !userLocation) locateMe();
+  }, [locateMe, nearbyRadius, userLocation]);
 
   const favoriteIdSet = new Set(favoriteIds);
   const recentIdSet = new Set(recentIds);
@@ -225,8 +248,8 @@ export default function HomePage() {
 
   const filtered = cameras
     .filter((camera) => {
-      if (selectedRoad && getCameraRoadNumber(camera) !== selectedRoad) return false;
-      if (selectedDirection && !directionMatches(selectedDirection, camera.direction)) return false;
+      if (trafficMode === 'road' && selectedRoad && getCameraRoadNumber(camera) !== selectedRoad) return false;
+      if (trafficMode === 'road' && selectedDirection && !directionMatches(selectedDirection, camera.direction)) return false;
       if (favoritesOnly && !favoriteIdSet.has(camera.id)) return false;
       if (recentOnly && !recentIdSet.has(camera.id)) return false;
       if (typeFilter !== 'all' && camera.type !== typeFilter) return false;
@@ -240,9 +263,9 @@ export default function HomePage() {
         distance: getDistance(userLocation.lat, userLocation.lng, camera.lat, camera.lng),
       };
     })
-    .filter((item) => nearbyRadius === null || (userLocation !== null && item.distance <= nearbyRadius * 1000));
+    .filter((item) => trafficMode !== 'nearby' || nearbyRadius === null || (userLocation !== null && item.distance <= nearbyRadius * 1000));
 
-  const sorted = nearbyRadius && userLocation
+  const sorted = trafficMode === 'nearby' && nearbyRadius && userLocation
     ? [...filtered].sort((a, b) => a.distance - b.distance)
     : sortByNearest && userLocation
       ? [...filtered].sort((a, b) => a.distance - b.distance)
@@ -372,7 +395,7 @@ export default function HomePage() {
                   </div>
                   <div className="min-w-0">
                     <h1 className="font-black text-sm tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                      全台監視器即時查詢
+                      台灣即時路況
                     </h1>
                     <p className="text-[10px] font-mono tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
                       TAIWAN LIVE TRAFFIC
@@ -380,22 +403,40 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <CameraSearchBar
-                  cameras={cameras}
-                  value={query}
-                  onChange={setQuery}
-                  onSelectRoad={handleRoadChange}
-                  onSelectCamera={handleDesktopSelect}
-                  placeholder="搜尋道路、地點、監視器…"
+                <RoutePlanner
+                  mode={trafficMode}
+                  onModeChange={handleTrafficModeChange}
+                  roadGroups={roadGroups}
+                  selectedRoad={selectedRoad}
+                  onRoadChange={handleRoadChange}
+                  directionOptions={directionOptions}
+                  selectedDirection={selectedDirection}
+                  onDirectionChange={setSelectedDirection}
+                  nearbyRadius={nearbyRadius}
+                  onNearbyChange={handleNearbyChange}
+                  routeFrom={routeFrom}
+                  routeTo={routeTo}
+                  routeVia={routeVia}
+                  onRouteFromChange={setRouteFrom}
+                  onRouteToChange={setRouteTo}
+                  onRouteViaChange={setRouteVia}
                 />
+
+                <div className="mt-3">
+                  <CameraSearchBar
+                    cameras={cameras}
+                    value={query}
+                    onChange={setQuery}
+                    onSelectRoad={handleRoadChange}
+                    onSelectCamera={handleDesktopSelect}
+                    placeholder="搜尋道路、地點、監視器…"
+                  />
+                </div>
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   {typeChips()}
                   {favoriteChip()}
                   {recentChip()}
-                  <RoadFilter groups={roadGroups} value={selectedRoad} onChange={handleRoadChange} />
-                  <DirectionFilter options={directionOptions} value={selectedDirection} onChange={setSelectedDirection} />
-                  <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} />
                 </div>
 
                 <div className="flex items-center gap-2 mt-3">
@@ -460,7 +501,7 @@ export default function HomePage() {
               <Map
                 cameras={filteredCameras}
                 query=""
-                direction={selectedDirection ?? undefined}
+                direction={trafficMode === 'road' ? selectedDirection ?? undefined : undefined}
                 onSelect={handleDesktopSelect}
                 userLocation={userLocation}
               />
@@ -468,7 +509,27 @@ export default function HomePage() {
           </div>
 
           <div className="md:hidden h-full relative z-10">
-            <div className="absolute inset-x-3 top-3 z-40">
+            <div className="absolute inset-x-3 top-3 z-40 space-y-2">
+              <RoutePlanner
+                mode={trafficMode}
+                onModeChange={handleTrafficModeChange}
+                roadGroups={roadGroups}
+                selectedRoad={selectedRoad}
+                onRoadChange={handleRoadChange}
+                directionOptions={directionOptions}
+                selectedDirection={selectedDirection}
+                onDirectionChange={setSelectedDirection}
+                nearbyRadius={nearbyRadius}
+                onNearbyChange={handleNearbyChange}
+                routeFrom={routeFrom}
+                routeTo={routeTo}
+                routeVia={routeVia}
+                onRouteFromChange={setRouteFrom}
+                onRouteToChange={setRouteTo}
+                onRouteViaChange={setRouteVia}
+                compact
+              />
+
               <div className="glass rounded-xl shadow-2xl p-1.5">
                 <CameraSearchBar
                   cameras={cameras}
@@ -479,18 +540,21 @@ export default function HomePage() {
                   placeholder="搜尋道路、地點、監視器…"
                 />
               </div>
+
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {typeChips(true)}
+                {favoriteChip(true)}
+                {recentChip(true)}
+              </div>
+
+              {(error || geolocationError) && (
+                <div className="rounded-lg px-3 py-2 text-xs glass" style={{ color: 'var(--accent-pink)' }}>
+                  {error || geolocationError}
+                </div>
+              )}
             </div>
 
-            <div className="absolute left-3 right-3 top-[4.5rem] z-40 flex gap-2 overflow-x-auto pb-1">
-              {typeChips(true)}
-              {favoriteChip(true)}
-              {recentChip(true)}
-              <RoadFilter groups={roadGroups} value={selectedRoad} onChange={handleRoadChange} compact />
-              <DirectionFilter options={directionOptions} value={selectedDirection} onChange={setSelectedDirection} compact />
-              <NearbyFilter value={nearbyRadius} onChange={handleNearbyChange} compact />
-            </div>
-
-            <div className="absolute right-3 top-[8.25rem] z-40 flex flex-col items-end gap-2">
+            <div className="absolute right-3 bottom-20 z-40 flex flex-col items-end gap-2">
               <button
                 type="button"
                 onClick={locateMe}
@@ -519,13 +583,6 @@ export default function HomePage() {
               </button>
             </div>
 
-            {(error || geolocationError) && (
-              <div className="absolute left-3 right-3 top-[11.35rem] z-40 rounded-lg px-3 py-2 text-xs glass"
-                style={{ color: 'var(--accent-pink)' }}>
-                {error || geolocationError}
-              </div>
-            )}
-
             {!mobileSelected && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex rounded-full overflow-hidden glass shadow-2xl p-1">
                 {(['map', 'list'] as const).map((mobileView) => (
@@ -550,13 +607,13 @@ export default function HomePage() {
                 <Map
                   cameras={filteredCameras}
                   query=""
-                  direction={selectedDirection ?? undefined}
+                  direction={trafficMode === 'road' ? selectedDirection ?? undefined : undefined}
                   onSelect={handleMobileSelect}
                   userLocation={userLocation}
                 />
               </div>
             ) : (
-              <div className="h-full overflow-y-auto px-3 pt-32 pb-24">
+              <div className={`h-full overflow-y-auto px-3 pb-24 ${trafficMode === 'route' ? 'pt-72' : 'pt-52'}`}>
                 <CameraList
                   cameras={filteredCameras}
                   query={query}
