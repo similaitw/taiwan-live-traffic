@@ -170,7 +170,7 @@ export default function RoutePlanner({
 
           {!compact && (
             <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              V3.1 先保存路線與開啟 Google Maps；V3.2 會依路廊自動排列沿途 CCTV。Google Maps URL 不需要 API Key。
+              道路模式已支援沿線 CCTV 排列與自動播放；路線模式後續會把多道路路廊串成同一播放序列。Google Maps URL 不需要 API Key。
             </p>
           )}
           {routeVia.filter((item) => item.trim()).length > 3 && (
