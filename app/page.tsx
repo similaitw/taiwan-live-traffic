@@ -645,6 +645,7 @@ export default function HomePage() {
                   direction={trafficMode === 'road' ? selectedDirection ?? undefined : undefined}
                   onSelect={handleMobileSelect}
                   userLocation={userLocation}
+                  activeCameraId={roadSequence ? sequenceCameraId ?? undefined : undefined}
                 />
               </div>
             ) : (
