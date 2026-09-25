@@ -8,21 +8,34 @@
 
 ## Current task
 
-### V3.1 — Route UX Foundation
+### V3.2 — Corridor CCTV sequence
 
 **Executor: ChatGPT**
 
-- [x] 建立 V3 product spec，改以「路線上的即時監控播放器」為核心。
-- [x] 新增 Route / Road / Nearby 三模式；Route 為新版預設。
-- [x] Route 支援起點、終點、最多 8 個途經點。
-- [x] 新增免 API Key 的 Google Maps Directions URL launcher。
-- [x] 新增 `mode / from / to / via` URL restore / share foundation，並相容既有 road / nearby URL。
-- [x] Desktop sidebar、mobile floating controls 重排；Tablet 沿用 sidebar + map breakpoint。
-- [x] 隱藏模式不再持續套用 road / nearby filter，避免模式切換後結果被舊條件暗中縮小。
-- [x] 新增 route-plan regression tests。
-- [ ] GitHub Actions audit / regression tests / production build 通過。
+目標：先用現有可靠的道路／方向／里程資料建立「沿線 CCTV 播放序列」，不宣稱是 Google 導航路線。
 
-完成後進 V3.2：Route Corridor → 沿途 CCTV sequence。
+- [ ] 抽出共用 Camera sequence：道路 + 方向 + 里程排序。
+- [ ] Road mode 直接得到穩定 sequence，提供 current / previous / next。
+- [ ] Route mode 建立可組合的 corridor model，為後續多道路 route segments 預留。
+- [ ] Map 與目前 sequence camera 可同步 focus。
+- [ ] URL 可保存 sequence current camera，舊 V2 camera URL 相容。
+- [ ] 補 regression tests。
+- [ ] CI audit / tests / build 通過。
+
+---
+
+## 近期完成
+
+### V3.1 — Route UX Foundation（完成）
+- [x] Route / Road / Nearby 三模式；Route 為新版預設。
+- [x] 起點、終點、最多 8 個途經點。
+- [x] 免 API Key Google Maps Directions URL launcher。
+- [x] `mode / from / to / via` URL restore / share foundation，並相容舊 road / nearby URL。
+- [x] Desktop / Tablet sidebar + map、Mobile floating RoutePlanner。
+- [x] 模式切換不再被隱藏的 road / nearby 條件暗中過濾。
+- [x] `tests/route-plan.test.ts`。
+- [x] Feature commit `025134274c7b3eeab381c01f85cff633a59c4911`。
+- [x] CI `36083617053`：audit / regression tests / production build 全綠。
 
 ---
 
@@ -101,7 +114,7 @@ Executor: Codex；驗收日期：2026-09-13～2026-09-14（Asia/Taipei）。
 - [x] **M20 Direction-aware road mode**。
 - [x] **M21 Accessibility / interaction hardening**。
 - [x] **M22 V2 release readiness** — Production accepted，詳見 M22.2 驗收紀錄。
-- [ ] **V3 路線型即時監控地圖** — V3.1 開發中。
+- [ ] **V3 路線型即時監控地圖** — V3.1 完成；V3.2 開發中。
 
 ---
 
