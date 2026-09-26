@@ -22,12 +22,26 @@
 - [x] 沿線播放器加入多點橫向排列、Snapshot autoplay 預設 ON、3/5/10 秒切換；LIVE 仍手動。
 - [x] 新增 4 套持久化 Skins：黑曜／海灣／森林／暮紫。
 - [x] 補 camera-sequence regression tests。
-- [ ] CI audit / tests / build 通過。
-- [ ] Production 部署與 375 / 768 / 1280 smoke test。
+- [x] CI audit / tests / build 通過：`36148795365`。
+- [ ] Production promotion / 375 / 768 / 1280 smoke test：Vercel Preview 已 READY；production promotion 因 GitHub 未設定 `VERCEL_TOKEN`，且 connector 無 promote 寫入工具，尚未完成。
 
 ---
 
 ## 近期完成
+
+### V3.2 — Corridor CCTV / Autoplay / Skins（功能完成，待 Production promotion）
+- [x] Feature commit：`04d6fe93344169b0690333678da4fa29807b4204`。
+- [x] Mobile map autoplay sync fix：`6acf138a8152dbf2de317ac39f724d90682c86d7`。
+- [x] Latest docs/main：`dee68e26924ef725a481e215c63a7df2c9448bf9`。
+- [x] 4 skins：黑曜／海灣／森林／暮紫，localStorage 持久化。
+- [x] Corridor player：Snapshot autoplay 預設 ON、3/5/10 秒、上一支／下一支、filmstrip。
+- [x] Road + direction + mileage sequence、`play=` URL restore、map active-camera sync。
+- [x] CI `36148795365` 全綠。
+- [x] Vercel Preview READY：`taiwan-live-traffic-5x3wjhsyo-similaitws-projects.vercel.app`。
+- [x] Vercel 近 24h runtime errors：0。
+- [ ] Promote to Production：一次性 workflow `36223703860` 安全停止，原因是 GitHub 尚未設定 `VERCEL_TOKEN`；workflow 已移除。
+
+---
 
 ### V3.1 — Route UX Foundation（完成）
 - [x] Route / Road / Nearby 三模式；Route 為新版預設。
@@ -117,7 +131,7 @@ Executor: Codex；驗收日期：2026-09-13～2026-09-14（Asia/Taipei）。
 - [x] **M20 Direction-aware road mode**。
 - [x] **M21 Accessibility / interaction hardening**。
 - [x] **M22 V2 release readiness** — Production accepted，詳見 M22.2 驗收紀錄。
-- [ ] **V3 路線型即時監控地圖** — V3.1 完成；V3.2 + autoplay + skins 開發中。
+- [ ] **V3 路線型即時監控地圖** — V3.1 完成；V3.2 / autoplay / skins 功能完成，待 production promotion + responsive smoke test。
 
 ---
 
