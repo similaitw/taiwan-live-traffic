@@ -109,6 +109,31 @@ function sampledRoutePoints(geometry: Array<[number, number]>): Array<{ lat: num
   return result;
 }
 
+function distanceToRouteSegment(
+  camera: Camera,
+  start: { lat: number; lng: number; order: number },
+  end: { lat: number; lng: number; order: number },
+): { distance: number; order: number } {
+  const latScale = 110_540;
+  const lngScale = 111_320 * Math.cos(camera.lat * Math.PI / 180);
+  const ax = (start.lng - camera.lng) * lngScale;
+  const ay = (start.lat - camera.lat) * latScale;
+  const bx = (end.lng - camera.lng) * lngScale;
+  const by = (end.lat - camera.lat) * latScale;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  const t = lengthSquared > 0
+    ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lengthSquared))
+    : 0;
+  const px = ax + t * dx;
+  const py = ay + t * dy;
+  return {
+    distance: Math.hypot(px, py),
+    order: start.order + t * (end.order - start.order),
+  };
+}
+
 export function buildRouteCameraSequence(
   cameras: Camera[],
   geometry: Array<[number, number]>,
@@ -117,15 +142,18 @@ export function buildRouteCameraSequence(
 ): CameraSequenceSegment {
   if (geometry.length < 2) return { id: 'route:empty', roadNumber: label, cameras: [] };
   const samples = sampledRoutePoints(geometry);
+
   const matched = cameras
     .map((camera) => {
       let nearestDistance = Number.POSITIVE_INFINITY;
       let nearestOrder = 0;
-      for (const sample of samples) {
-        const distance = getDistance(camera.lat, camera.lng, sample.lat, sample.lng);
-        if (distance < nearestDistance) {
-          nearestDistance = distance;
-          nearestOrder = sample.order;
+      for (let index = 0; index < samples.length - 1; index += 1) {
+        const start = samples[index]!;
+        const end = samples[index + 1]!;
+        const candidate = distanceToRouteSegment(camera, start, end);
+        if (candidate.distance < nearestDistance) {
+          nearestDistance = candidate.distance;
+          nearestOrder = candidate.order;
         }
       }
       return { camera, nearestDistance, nearestOrder };
