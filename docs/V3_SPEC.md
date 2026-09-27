@@ -142,3 +142,15 @@ V3.3：
 ## 8. Skins
 
 V3 提供持久化 Skin 切換，預設「黑曜」：黑曜／海灣／森林／暮紫。Skin 使用 CSS variables + `data-skin`，存在 localStorage，不影響資料與分享 URL。
+
+## 9. Implementation status
+
+- **V3.1 Route UX Foundation**：完成。
+- **V3.2 Corridor CCTV**：道路 / 方向 / 里程 sequence、previous / next、map focus 已完成。
+- **V3.3 Autoplay**：Snapshot autoplay 預設 ON、3 / 5 / 10 秒已完成；LIVE 仍為手動。
+- **V3.4 Filmstrip**：沿線橫向 sequence 已完成。
+- **Skins**：黑曜／海灣／森林／暮紫，localStorage 持久化已完成。
+- **V3.5 Multi Camera**：待開發。
+- **V3.6 Google Maps Bridge**：基本 Maps URL 已完成；常用路線待開發。
+- **V3.7 Traffic Context**：沿用既有 TDX / CMS / CWA，route-level 整合仍可再強化。
+- **V3.8 Responsive Polish**：待 production 對齊後做 375 / 768 / 1280 最終驗收。
