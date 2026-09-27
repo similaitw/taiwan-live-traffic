@@ -13,7 +13,7 @@ V3 的核心問題不是「哪裡有監視器」，而是：
 3. 系統建立 Route Corridor，挑出沿途 CCTV。
 4. CCTV 依道路方向與里程形成 sequence。
 5. 預設啟用 snapshot autoplay；目前播放中的 Camera 與地圖同步。
-6. 需要真正導航時，用免 API Key 的 Google Maps URL 開啟 Google Maps。
+6. Route mode 直接在站內計算行車路線、畫線並形成沿途 CCTV sequence。
 
 ## 2. 地圖策略
 
@@ -23,15 +23,12 @@ V3 的核心問題不是「哪裡有監視器」，而是：
 - 免費、不依賴 Google Maps JavaScript API。
 - 負責 CCTV、cluster、route corridor、TDX、CMS、CWA、目前播放 Camera。
 
-### Google Maps
+### 路線服務
 
-只使用 Maps URL：
-
-- `https://www.google.com/maps/dir/?api=1`
-- 不需要 API Key。
-- 交給 Google Maps 處理導航、ETA 與重新計算路線。
-- URL 長度上限需注意 2,048 字元。
-- 官方文件：手機瀏覽器最多支援 3 個 waypoints，其他平台最多 9 個；站內 RoutePlan 最多保留 8 個途經點。
+- 地點解析：OpenStreetMap Nominatim，限台灣、按鈕觸發、不做 autocomplete。
+- 行車路線：OSRM Route API，回傳 GeoJSON。
+- 路線 Provider 由 server-side `/api/route-plan` 隔離，未來可替換自架服務。
+- 站內不依賴 Google Maps JavaScript API / API Key。
 
 ## 3. 三模式
 
@@ -102,7 +99,7 @@ V3.3：
 ### V3.1 Route UX Foundation
 - 三模式。
 - 起點/終點/途經點。
-- Google Maps URL launcher。
+- Route input / URL restore foundation。
 - URL restore/share foundation。
 - 手機/平板/桌面 responsive shell。
 
@@ -122,14 +119,15 @@ V3.3：
 - 桌面 bottom filmstrip。
 - active Camera auto-scroll。
 
-### V3.5 Multi Camera
-- 1 / 2 / 4 / 6 格 snapshot。
-- 單支 LIVE explicit opt-in。
+### V3.5 In-app Route Planner
+- Nominatim geocoding + OSRM driving route。
+- Leaflet route geometry。
+- 1.5km CCTV corridor + route progress ordering。
 
-### V3.6 Google Maps Bridge
-- 強化 Maps URL。
-- 多點平台限制提示。
+### V3.6 Multi Camera / Saved Routes
+- 1 / 2 / 4 / 6 格 snapshot。
 - 常用路線 localStorage。
+- 單支 LIVE explicit opt-in。
 
 ### V3.7 Traffic Context
 - route-level event / congestion / CMS / rainfall summary。
@@ -150,7 +148,18 @@ V3 提供持久化 Skin 切換，預設「黑曜」：黑曜／海灣／森林�
 - **V3.3 Autoplay**：Snapshot autoplay 預設 ON、3 / 5 / 10 秒已完成；LIVE 仍為手動。
 - **V3.4 Filmstrip**：沿線橫向 sequence 已完成。
 - **Skins**：黑曜／海灣／森林／暮紫，localStorage 持久化已完成。
-- **V3.5 Multi Camera**：待開發。
-- **V3.6 Google Maps Bridge**：基本 Maps URL 已完成；常用路線待開發。
+- **V3.5 In-app Route Planner**：完成；Nominatim + OSRM + Leaflet geometry + route CCTV sequence。
+- **V3.6 Multi Camera / Saved Routes**：待開發。
 - **V3.7 Traffic Context**：沿用既有 TDX / CMS / CWA，route-level 整合仍可再強化。
 - **V3.8 Responsive Polish**：待 production 對齊後做 375 / 768 / 1280 最終驗收。
+
+
+## 10. Actual in-app routing
+
+- Route mode 不再以 Google Maps 外部 URL 當核心。
+- 使用者按「規畫路線」才送出地理編碼，不做 autocomplete。
+- Nominatim 限台灣、server-side proxy、User-Agent / Referer、1 req/s pacing、warm-cache。
+- OSRM Route API 回傳 GeoJSON。
+- Leaflet 站內繪製路線並 fit bounds。
+- 以約 1.5km corridor 找出 CCTV，再依 route progress 排列成 autoplay sequence。
+- Provider 集中在 `/api/route-plan`，未來可替換自架服務。
