@@ -1,6 +1,5 @@
 import { directionMatches, normalizeTravelDirection, type TravelDirection } from '@/lib/directions';
 import { getCameraRoadNumber, normalizeRoadNumber, sortRoadCameras } from '@/lib/roads';
-import { getDistance } from '@/lib/geo';
 import type { Camera } from '@/types/camera';
 
 export interface CameraSequenceSegment {
