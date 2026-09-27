@@ -22,9 +22,11 @@
 - [x] Mobile autoplay / map sync fix。
 - [x] CI `36148795365`：audit / regression tests / production build 全綠。
 - [x] Vercel Preview READY，近 24h runtime errors = 0。
-- [ ] 以本次 `main` 文件整併 push 驗證 Vercel Git integration 是否自動建立 **production** deployment。
-- [ ] 若仍只建立 Preview：Vercel Project → Settings → Git → Production Branch 修正為 `main`。
-- [ ] Production 對齊最新 `main` 後執行 375 / 768 / 1280 smoke test。
+- [x] Repo 端已補 `vercel.json`：`git.deploymentEnabled.main = true`，commit `040d669a9a7b573806f9aba6f65366cc93bfce61`。
+- [x] GitHub CI `36285965278`：install / audit / regression tests / production build 全綠。
+- [x] 實測最新 `main` push 後 Vercel **沒有建立任何新 deployment**；可排除 repo config 禁止部署。
+- [ ] Vercel 專案層 Git integration 需重新確認：Project → Settings → Git → Repository = `similaitw/taiwan-live-traffic`、Production Branch = `main`。目前 connector 無 project-setting 寫入能力，`get_project` 也回工具參數契約錯誤。
+- [ ] Git integration 恢復後，Production 對齊最新 `main`，再執行 375 / 768 / 1280 smoke test。
 
 ---
 
