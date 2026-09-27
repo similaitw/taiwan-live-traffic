@@ -8,28 +8,29 @@
 
 ## Current task
 
-### V3.2 — Corridor CCTV sequence
+### V3 Release alignment — GitHub → Vercel Production
 
 **Executor: ChatGPT**
 
-目標：先用現有可靠的道路／方向／里程資料建立「沿線 CCTV 播放序列」，不宣稱是 Google 導航路線。
+功能面已完成 V3.2 + autoplay + skins，現在只處理部署來源對齊，不再新增產品功能。
 
-- [x] 抽出共用 Camera sequence：道路 + 方向 + 里程排序。
-- [x] Road mode 直接得到穩定 sequence，提供 current / previous / next。
-- [x] Route mode 建立可組合的 corridor segment / sequence model，為後續多道路 route segments 預留。
-- [x] Map 與目前 sequence camera 同步 focus / highlight。
-- [x] URL 用 `play=` 保存 sequence current camera；既有 `camera=` detail URL 保持相容。
-- [x] 沿線播放器加入多點橫向排列、Snapshot autoplay 預設 ON、3/5/10 秒切換；LIVE 仍手動。
-- [x] 新增 4 套持久化 Skins：黑曜／海灣／森林／暮紫。
-- [x] 補 camera-sequence regression tests。
-- [x] CI audit / tests / build 通過：`36148795365`。
-- [ ] Production promotion / 375 / 768 / 1280 smoke test：Vercel Preview 已 READY；production promotion 因 GitHub 未設定 `VERCEL_TOKEN`，且 connector 無 promote 寫入工具，尚未完成。
+- [x] Road + direction + mileage CCTV sequence。
+- [x] current / previous / next、`play=` URL restore、map active-camera sync。
+- [x] Snapshot autoplay 預設 ON，3 / 5 / 10 秒，LIVE 維持 explicit opt-in。
+- [x] 橫向 filmstrip。
+- [x] 4 套持久化 skins：黑曜／海灣／森林／暮紫。
+- [x] Mobile autoplay / map sync fix。
+- [x] CI `36148795365`：audit / regression tests / production build 全綠。
+- [x] Vercel Preview READY，近 24h runtime errors = 0。
+- [ ] 以本次 `main` 文件整併 push 驗證 Vercel Git integration 是否自動建立 **production** deployment。
+- [ ] 若仍只建立 Preview：Vercel Project → Settings → Git → Production Branch 修正為 `main`。
+- [ ] Production 對齊最新 `main` 後執行 375 / 768 / 1280 smoke test。
 
 ---
 
 ## 近期完成
 
-### V3.2 — Corridor CCTV / Autoplay / Skins（功能完成，待 Production promotion）
+### V3.2 / V3.3 / V3.4 — Corridor CCTV / Autoplay / Filmstrip / Skins（功能完成）
 - [x] Feature commit：`04d6fe93344169b0690333678da4fa29807b4204`。
 - [x] Mobile map autoplay sync fix：`6acf138a8152dbf2de317ac39f724d90682c86d7`。
 - [x] Latest docs/main：`dee68e26924ef725a481e215c63a7df2c9448bf9`。
@@ -39,7 +40,7 @@
 - [x] CI `36148795365` 全綠。
 - [x] Vercel Preview READY：`taiwan-live-traffic-5x3wjhsyo-similaitws-projects.vercel.app`。
 - [x] Vercel 近 24h runtime errors：0。
-- [ ] Promote to Production：一次性 workflow `36223703860` 安全停止，原因是 GitHub 尚未設定 `VERCEL_TOKEN`；workflow 已移除。
+- [x] 已確認不採額外 `VERCEL_TOKEN` promotion workflow；正式部署應回歸 Vercel Git integration（Production Branch = `main`）。
 
 ---
 
@@ -131,7 +132,7 @@ Executor: Codex；驗收日期：2026-09-13～2026-09-14（Asia/Taipei）。
 - [x] **M20 Direction-aware road mode**。
 - [x] **M21 Accessibility / interaction hardening**。
 - [x] **M22 V2 release readiness** — Production accepted，詳見 M22.2 驗收紀錄。
-- [ ] **V3 路線型即時監控地圖** — V3.1 完成；V3.2 / autoplay / skins 功能完成，待 production promotion + responsive smoke test。
+- [ ] **V3 路線型即時監控地圖** — V3.1–V3.4 核心已完成，待 Git→Vercel production 對齊與 responsive smoke test。
 
 ---
 
