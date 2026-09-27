@@ -10,8 +10,8 @@
 - 上一支 / 下一支、橫向 CCTV filmstrip、地圖跟隨目前播放 Camera。
 - LIVE 維持使用者手動啟動，不會因 autoplay 自動開啟 MJPEG。
 - 起點 / 終點 / 最多 8 個途經點。
-- 使用 **Google Maps URL** 開啟導航，不使用 Google Maps JavaScript API / API Key。
-- 站內地圖使用 Leaflet + OpenStreetMap。
+- **站內實際規畫行車路線**：Nominatim 地點解析 + OSRM driving route，不需要 Google API Key。
+- Leaflet + OpenStreetMap 直接畫出路線，並自動挑出路線附近 CCTV 排成播放序列。
 - 4 套持久化 Skins：**黑曜 / 海灣 / 森林 / 暮紫**。
 - TDX 事件 / 車流 / CMS、CWA 雨量 / 雷達、收藏、最近觀看、Nearby 等 V2 功能保留。
 
