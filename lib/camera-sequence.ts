@@ -1,5 +1,6 @@
 import { directionMatches, normalizeTravelDirection, type TravelDirection } from '@/lib/directions';
 import { getCameraRoadNumber, normalizeRoadNumber, sortRoadCameras } from '@/lib/roads';
+import { getDistance } from '@/lib/geo';
 import type { Camera } from '@/types/camera';
 
 export interface CameraSequenceSegment {
@@ -90,5 +91,53 @@ export function getCameraSequencePosition(
     index,
     position: index + 1,
     total: cameras.length,
+  };
+}
+
+
+const ROUTE_SAMPLE_LIMIT = 320;
+
+function sampledRoutePoints(geometry: Array<[number, number]>): Array<{ lat: number; lng: number; order: number }> {
+  if (geometry.length <= ROUTE_SAMPLE_LIMIT) return geometry.map(([lat, lng], order) => ({ lat, lng, order }));
+  const result: Array<{ lat: number; lng: number; order: number }> = [];
+  const step = (geometry.length - 1) / (ROUTE_SAMPLE_LIMIT - 1);
+  for (let i = 0; i < ROUTE_SAMPLE_LIMIT; i += 1) {
+    const order = Math.min(geometry.length - 1, Math.round(i * step));
+    const point = geometry[order]!;
+    result.push({ lat: point[0], lng: point[1], order });
+  }
+  return result;
+}
+
+export function buildRouteCameraSequence(
+  cameras: Camera[],
+  geometry: Array<[number, number]>,
+  corridorMeters = 1500,
+  label = '規畫路線',
+): CameraSequenceSegment {
+  if (geometry.length < 2) return { id: 'route:empty', roadNumber: label, cameras: [] };
+  const samples = sampledRoutePoints(geometry);
+  const matched = cameras
+    .map((camera) => {
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      let nearestOrder = 0;
+      for (const sample of samples) {
+        const distance = getDistance(camera.lat, camera.lng, sample.lat, sample.lng);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestOrder = sample.order;
+        }
+      }
+      return { camera, nearestDistance, nearestOrder };
+    })
+    .filter((item) => item.nearestDistance <= corridorMeters)
+    .sort((a, b) => a.nearestOrder - b.nearestOrder || a.nearestDistance - b.nearestDistance)
+    .slice(0, 120)
+    .map((item) => item.camera);
+
+  return {
+    id: `route:planned:${geometry.length}:${matched.length}`,
+    roadNumber: label || '規畫路線',
+    cameras: matched,
   };
 }
