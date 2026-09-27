@@ -21,7 +21,8 @@ import NearbyFilter, { type NearbyRadius } from '@/components/NearbyFilter';
 import Map from '@/components/Map';
 import RoutePlanner from '@/components/RoutePlanner';
 import CorridorPlayer from '@/components/CorridorPlayer';
-import { buildRoadCameraSequence } from '@/lib/camera-sequence';
+import { buildRoadCameraSequence, buildRouteCameraSequence } from '@/lib/camera-sequence';
+import type { PlannedRoute } from '@/lib/route-routing';
 import { normalizeTrafficMode, parseRouteViaParam, serializeRouteViaParam, type TrafficMode } from '@/lib/route-plan';
 
 type View = 'map' | 'list';
@@ -72,6 +73,9 @@ export default function HomePage() {
   const [routeFrom, setRouteFrom] = useState('');
   const [routeTo, setRouteTo] = useState('');
   const [routeVia, setRouteVia] = useState<string[]>([]);
+  const [plannedRoute, setPlannedRoute] = useState<PlannedRoute | null>(null);
+  const [routePlanning, setRoutePlanning] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
   const [sequenceCameraId, setSequenceCameraId] = useState<string | null>(null);
   const [urlReady, setUrlReady] = useState(false);
   const pendingCameraIdRef = useRef<string | null>(null);
@@ -97,6 +101,24 @@ export default function HomePage() {
     ),
     [cameras, selectedDirection, selectedRoad, trafficMode],
   );
+  const routeSequence = useMemo(
+    () => (
+      trafficMode === 'route' && plannedRoute
+        ? buildRouteCameraSequence(
+            typeFilter === 'all' ? cameras : cameras.filter((camera) => camera.type === typeFilter),
+            plannedRoute.geometry,
+            1500,
+            `${routeFrom.trim()} → ${routeTo.trim()}`,
+          )
+        : null
+    ),
+    [cameras, plannedRoute, routeFrom, routeTo, trafficMode, typeFilter],
+  );
+  const activeSequence = trafficMode === 'road' ? roadSequence : trafficMode === 'route' ? routeSequence : null;
+  const routeCameraIds = useMemo(
+    () => new Set(routeSequence?.cameras.map((camera) => camera.id) ?? []),
+    [routeSequence],
+  );
   const mobileRoadNeighbors = useMemo(
     () => (mobileSelected ? getRoadNeighbors(cameras, mobileSelected) : null),
     [cameras, mobileSelected]
@@ -117,14 +139,14 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!roadSequence || roadSequence.cameras.length === 0) {
+    if (!activeSequence || activeSequence.cameras.length === 0) {
       if (sequenceCameraId) setSequenceCameraId(null);
       return;
     }
-    if (!sequenceCameraId || !roadSequence.cameras.some((camera) => camera.id === sequenceCameraId)) {
-      setSequenceCameraId(roadSequence.cameras[0]!.id);
+    if (!sequenceCameraId || !activeSequence.cameras.some((camera) => camera.id === sequenceCameraId)) {
+      setSequenceCameraId(activeSequence.cameras[0]!.id);
     }
-  }, [roadSequence, sequenceCameraId]);
+  }, [activeSequence, sequenceCameraId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -169,7 +191,7 @@ export default function HomePage() {
       road: trafficMode === 'road' ? selectedRoad : null,
       direction: trafficMode === 'road' && selectedRoad ? selectedDirection : null,
       nearby: trafficMode === 'nearby' && nearbyRadius ? String(nearbyRadius) : null,
-      play: trafficMode === 'road' ? sequenceCameraId : null,
+      play: trafficMode === 'nearby' ? null : sequenceCameraId,
     });
   }, [nearbyRadius, query, routeFrom, routeTo, routeVia, selectedDirection, selectedRoad, sequenceCameraId, trafficMode, typeFilter, updateUrl, urlReady]);
 
@@ -261,9 +283,62 @@ export default function HomePage() {
 
   const handleTrafficModeChange = useCallback((mode: TrafficMode) => {
     setTrafficMode(mode);
-    if (mode !== 'road') setSequenceCameraId(null);
+    if (mode === 'nearby') setSequenceCameraId(null);
     if (mode === 'nearby' && nearbyRadius && !userLocation) locateMe();
   }, [locateMe, nearbyRadius, userLocation]);
+
+  const handleRouteFromChange = useCallback((value: string) => {
+    setRouteFrom(value);
+    setPlannedRoute(null);
+    setRouteError(null);
+    setSequenceCameraId(null);
+  }, []);
+
+  const handleRouteToChange = useCallback((value: string) => {
+    setRouteTo(value);
+    setPlannedRoute(null);
+    setRouteError(null);
+    setSequenceCameraId(null);
+  }, []);
+
+  const handleRouteViaChange = useCallback((value: string[]) => {
+    setRouteVia(value);
+    setPlannedRoute(null);
+    setRouteError(null);
+    setSequenceCameraId(null);
+  }, []);
+
+  const handlePlanRoute = useCallback(async () => {
+    const stops = [routeFrom.trim(), ...routeVia.map((item) => item.trim()).filter(Boolean), routeTo.trim()];
+    if (!stops[0] || !stops[stops.length - 1]) {
+      setRouteError('請先填入起點與終點');
+      return;
+    }
+
+    setRoutePlanning(true);
+    setRouteError(null);
+    try {
+      const response = await fetch('/api/route-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stops }),
+      });
+      const payload = await response.json() as PlannedRoute | { error?: string };
+      if (!response.ok || !('geometry' in payload)) {
+        throw new Error(('error' in payload && payload.error) || '目前無法規畫路線');
+      }
+
+      setTrafficMode('route');
+      setPlannedRoute(payload);
+      setSequenceCameraId(null);
+      setView('map');
+    } catch (routePlanError) {
+      setPlannedRoute(null);
+      setRouteError(routePlanError instanceof Error ? routePlanError.message : '目前無法規畫路線');
+    } finally {
+      setRoutePlanning(false);
+    }
+  }, [routeFrom, routeTo, routeVia]);
 
   const handleSequenceActiveChange = useCallback((camera: Camera) => {
     setSequenceCameraId(camera.id);
@@ -284,6 +359,7 @@ export default function HomePage() {
     .filter((camera) => {
       if (trafficMode === 'road' && selectedRoad && getCameraRoadNumber(camera) !== selectedRoad) return false;
       if (trafficMode === 'road' && selectedDirection && !directionMatches(selectedDirection, camera.direction)) return false;
+      if (trafficMode === 'route' && plannedRoute && !routeCameraIds.has(camera.id)) return false;
       if (favoritesOnly && !favoriteIdSet.has(camera.id)) return false;
       if (recentOnly && !recentIdSet.has(camera.id)) return false;
       if (typeFilter !== 'all' && camera.type !== typeFilter) return false;
@@ -451,9 +527,14 @@ export default function HomePage() {
                   routeFrom={routeFrom}
                   routeTo={routeTo}
                   routeVia={routeVia}
-                  onRouteFromChange={setRouteFrom}
-                  onRouteToChange={setRouteTo}
-                  onRouteViaChange={setRouteVia}
+                  onRouteFromChange={handleRouteFromChange}
+                  onRouteToChange={handleRouteToChange}
+                  onRouteViaChange={handleRouteViaChange}
+                  onPlanRoute={handlePlanRoute}
+                  routePlanning={routePlanning}
+                  routeError={routeError}
+                  routeResult={plannedRoute}
+                  routeCameraCount={routeSequence?.cameras.length ?? null}
                 />
 
                 <div className="mt-3">
@@ -538,7 +619,8 @@ export default function HomePage() {
                 direction={trafficMode === 'road' ? selectedDirection ?? undefined : undefined}
                 onSelect={handleDesktopSelect}
                 userLocation={userLocation}
-                activeCameraId={roadSequence ? sequenceCameraId ?? undefined : undefined}
+                activeCameraId={activeSequence ? sequenceCameraId ?? undefined : undefined}
+                routeGeometry={trafficMode === 'route' ? plannedRoute?.geometry : undefined}
               />
             </section>
           </div>
@@ -559,9 +641,14 @@ export default function HomePage() {
                 routeFrom={routeFrom}
                 routeTo={routeTo}
                 routeVia={routeVia}
-                onRouteFromChange={setRouteFrom}
-                onRouteToChange={setRouteTo}
-                onRouteViaChange={setRouteVia}
+                onRouteFromChange={handleRouteFromChange}
+                onRouteToChange={handleRouteToChange}
+                onRouteViaChange={handleRouteViaChange}
+                onPlanRoute={handlePlanRoute}
+                routePlanning={routePlanning}
+                routeError={routeError}
+                routeResult={plannedRoute}
+                routeCameraCount={routeSequence?.cameras.length ?? null}
                 compact
               />
 
@@ -645,7 +732,8 @@ export default function HomePage() {
                   direction={trafficMode === 'road' ? selectedDirection ?? undefined : undefined}
                   onSelect={handleMobileSelect}
                   userLocation={userLocation}
-                  activeCameraId={roadSequence ? sequenceCameraId ?? undefined : undefined}
+                  activeCameraId={activeSequence ? sequenceCameraId ?? undefined : undefined}
+                routeGeometry={trafficMode === 'route' ? plannedRoute?.geometry : undefined}
                 />
               </div>
             ) : (
@@ -663,9 +751,9 @@ export default function HomePage() {
         </>
       )}
 
-      {roadSequence && roadSequence.cameras.length > 0 && (
+      {activeSequence && activeSequence.cameras.length > 0 && (
         <CorridorPlayer
-          sequence={roadSequence}
+          sequence={activeSequence}
           activeCameraId={sequenceCameraId}
           onActiveChange={handleSequenceActiveChange}
           onInspect={handleSequenceInspect}
