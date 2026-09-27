@@ -217,9 +217,10 @@ interface Props {
   rainfallStations?: RainfallStation[];
   radarImageUrl?: string;
   activeCameraId?: string;
+  routeGeometry?: Array<[number, number]>;
 }
 
-export default function MapInner({ cameras, query, onSelect, userLocation, trafficEvents = [], trafficFlowSegments = [], cmsDevices = [], cmsPreferredCameraIds = {}, rainfallStations = [], radarImageUrl, activeCameraId }: Props) {
+export default function MapInner({ cameras, query, onSelect, userLocation, trafficEvents = [], trafficFlowSegments = [], cmsDevices = [], cmsPreferredCameraIds = {}, rainfallStations = [], radarImageUrl, activeCameraId, routeGeometry }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const cameraLayerRef = useRef<L.LayerGroup | null>(null);
@@ -229,6 +230,7 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
   const flowLayerRef = useRef<L.LayerGroup | null>(null);
   const radarOverlayRef = useRef<L.ImageOverlay | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
+  const routeLineRef = useRef<L.Polyline | null>(null);
   const renderedMarkersRef = useRef<Map<string, RenderedMarker>>(new Map());
   const renderedRainfallRef = useRef<Map<string, RenderedMarker>>(new Map());
   const renderedCmsRef = useRef<Map<string, RenderedMarker>>(new Map());
@@ -265,9 +267,33 @@ export default function MapInner({ cameras, query, onSelect, userLocation, traff
       if (flowFrameRef.current !== null) cancelAnimationFrame(flowFrameRef.current);
       renderedMarkersRef.current.clear(); renderedRainfallRef.current.clear(); renderedCmsRef.current.clear(); renderedEventMarkersRef.current.clear(); renderedFlowRef.current.clear();
       radarOverlayRef.current = null;
+      routeLineRef.current = null;
       map.remove(); mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (routeLineRef.current) {
+      map.removeLayer(routeLineRef.current);
+      routeLineRef.current = null;
+    }
+    if (!routeGeometry || routeGeometry.length < 2) return;
+    const line = L.polyline(routeGeometry, {
+      color: '#3b82f6',
+      weight: 5,
+      opacity: 0.88,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(map);
+    routeLineRef.current = line;
+    map.fitBounds(line.getBounds(), { padding: [36, 36], maxZoom: 14, animate: true });
+    return () => {
+      if (map.hasLayer(line)) map.removeLayer(line);
+      if (routeLineRef.current === line) routeLineRef.current = null;
+    };
+  }, [routeGeometry]);
 
   useEffect(() => {
     const map = mapRef.current;
