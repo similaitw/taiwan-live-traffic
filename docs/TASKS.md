@@ -8,25 +8,22 @@
 
 ## Current task
 
-### V3 Release alignment — GitHub → Vercel Production
+### V3.5 — 真正的站內 Route Planner
 
 **Executor: ChatGPT**
 
-功能面已完成 V3.2 + autoplay + skins，現在只處理部署來源對齊，不再新增產品功能。
+原本「起點／終點 + Google Maps URL」只會外部跳轉，無法提供站內路線 geometry，也不能真正形成沿途 CCTV，因此已改成完整站內路線流程。
 
-- [x] Road + direction + mileage CCTV sequence。
-- [x] current / previous / next、`play=` URL restore、map active-camera sync。
-- [x] Snapshot autoplay 預設 ON，3 / 5 / 10 秒，LIVE 維持 explicit opt-in。
-- [x] 橫向 filmstrip。
-- [x] 4 套持久化 skins：黑曜／海灣／森林／暮紫。
-- [x] Mobile autoplay / map sync fix。
-- [x] CI `36148795365`：audit / regression tests / production build 全綠。
-- [x] Vercel Preview READY，近 24h runtime errors = 0。
-- [x] Repo 端已補 `vercel.json`：`git.deploymentEnabled.main = true`，commit `040d669a9a7b573806f9aba6f65366cc93bfce61`。
-- [x] GitHub CI `36285965278`：install / audit / regression tests / production build 全綠。
-- [x] 實測最新 `main` push 後 Vercel **沒有建立任何新 deployment**；可排除 repo config 禁止部署。
-- [ ] Vercel 專案層 Git integration 需重新確認：Project → Settings → Git → Repository = `similaitw/taiwan-live-traffic`、Production Branch = `main`。目前 connector 無 project-setting 寫入能力，`get_project` 也回工具參數契約錯誤。
-- [ ] Git integration 恢復後，Production 對齊最新 `main`，再執行 375 / 768 / 1280 smoke test。
+- [x] `/api/route-plan`：Nominatim（限台灣）地理編碼 → OSRM driving route。
+- [x] Nominatim 僅在按「規畫路線」時呼叫，不做 autocomplete；1 req/s pacing + warm-cache。
+- [x] Route Planner 主操作改成「規畫路線」，移除 Google Maps URL 核心功能。
+- [x] Leaflet 直接畫 route geometry 並 fit bounds。
+- [x] 以 route polyline segment 最短距離挑出 1.5km corridor 內 CCTV。
+- [x] CCTV 依 route progress 排序，直接接既有 Snapshot autoplay / 3-5-10秒 / filmstrip。
+- [x] Route mode 的 map/list 在規畫後只顯示沿途 CCTV。
+- [x] route camera regression tests；修正稀疏 geometry 時的 segment-distance matching。
+- [x] CI `36287099183`：audit / 全部 regression tests / production build 全綠。
+- [ ] Vercel Git integration 恢復後部署 production，實測「羅東 → 台北」與 375 / 768 / 1280。
 
 ---
 
@@ -134,7 +131,7 @@ Executor: Codex；驗收日期：2026-09-13～2026-09-14（Asia/Taipei）。
 - [x] **M20 Direction-aware road mode**。
 - [x] **M21 Accessibility / interaction hardening**。
 - [x] **M22 V2 release readiness** — Production accepted，詳見 M22.2 驗收紀錄。
-- [ ] **V3 路線型即時監控地圖** — V3.1–V3.4 核心已完成，待 Git→Vercel production 對齊與 responsive smoke test。
+- [ ] **V3 路線型即時監控地圖** — V3.1–V3.5 核心功能完成，待 Vercel production 同步與 responsive smoke test。
 
 ---
 
