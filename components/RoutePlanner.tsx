@@ -3,14 +3,11 @@
 import RoadFilter from '@/components/RoadFilter';
 import DirectionFilter from '@/components/DirectionFilter';
 import NearbyFilter, { type NearbyRadius } from '@/components/NearbyFilter';
+import SkinSwitcher from '@/components/SkinSwitcher';
 import type { DirectionOption, TravelDirection } from '@/lib/directions';
 import type { RoadGroup } from '@/lib/roads';
-import SkinSwitcher from '@/components/SkinSwitcher';
-import {
-  MAX_ROUTE_STOPS,
-  buildGoogleMapsDirectionsUrl,
-  type TrafficMode,
-} from '@/lib/route-plan';
+import { MAX_ROUTE_STOPS, type TrafficMode } from '@/lib/route-plan';
+import type { PlannedRoute } from '@/lib/route-routing';
 
 interface Props {
   mode: TrafficMode;
@@ -29,6 +26,11 @@ interface Props {
   onRouteFromChange: (value: string) => void;
   onRouteToChange: (value: string) => void;
   onRouteViaChange: (value: string[]) => void;
+  onPlanRoute: () => void;
+  routePlanning: boolean;
+  routeError?: string | null;
+  routeResult?: PlannedRoute | null;
+  routeCameraCount?: number | null;
   compact?: boolean;
 }
 
@@ -37,6 +39,20 @@ const MODES: Array<{ value: TrafficMode; label: string; icon: string }> = [
   { value: 'road', label: '道路', icon: '⇢' },
   { value: 'nearby', label: '附近', icon: '◎' },
 ];
+
+function formatDistance(meters: number): string {
+  return meters >= 1000
+    ? `${(meters / 1000).toFixed(meters >= 10000 ? 0 : 1)} km`
+    : `${Math.round(meters)} m`;
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes < 60) return `約 ${minutes} 分`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `約 ${hours} 小時 ${rest} 分` : `約 ${hours} 小時`;
+}
 
 export default function RoutePlanner({
   mode,
@@ -55,14 +71,13 @@ export default function RoutePlanner({
   onRouteFromChange,
   onRouteToChange,
   onRouteViaChange,
+  onPlanRoute,
+  routePlanning,
+  routeError,
+  routeResult,
+  routeCameraCount,
   compact = false,
 }: Props) {
-  const googleMapsUrl = buildGoogleMapsDirectionsUrl({
-    from: routeFrom,
-    to: routeTo,
-    via: routeVia,
-  });
-
   const setVia = (index: number, value: string) => {
     const next = [...routeVia];
     next[index] = value;
@@ -72,6 +87,8 @@ export default function RoutePlanner({
   const removeVia = (index: number) => {
     onRouteViaChange(routeVia.filter((_, itemIndex) => itemIndex !== index));
   };
+
+  const canPlan = Boolean(routeFrom.trim() && routeTo.trim());
 
   return (
     <section
@@ -85,26 +102,26 @@ export default function RoutePlanner({
       <div className="flex items-center gap-2">
         <div className="grid flex-1 grid-cols-3 gap-1 rounded-xl p-1"
           style={{ background: 'var(--surface-soft)' }}>
-        {MODES.map((item) => {
-          const active = mode === item.value;
-          return (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => onModeChange(item.value)}
-              className="min-h-9 rounded-lg px-2 text-xs font-black transition-all"
-              style={{
-                background: active ? 'var(--accent-freeway)' : 'transparent',
-                color: active ? '#fff' : 'var(--text-secondary)',
-                boxShadow: active ? '0 6px 16px rgba(59,130,246,0.22)' : 'none',
-              }}
-              aria-pressed={active}
-            >
-              <span aria-hidden="true" className="mr-1">{item.icon}</span>
-              {item.label}
-            </button>
-          );
-        })}
+          {MODES.map((item) => {
+            const active = mode === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => onModeChange(item.value)}
+                className="min-h-9 rounded-lg px-2 text-xs font-black transition-all"
+                style={{
+                  background: active ? 'var(--accent-freeway)' : 'transparent',
+                  color: active ? '#fff' : 'var(--text-secondary)',
+                  boxShadow: active ? '0 6px 16px rgba(59,130,246,0.22)' : 'none',
+                }}
+                aria-pressed={active}
+              >
+                <span aria-hidden="true" className="mr-1">{item.icon}</span>
+                {item.label}
+              </button>
+            );
+          })}
         </div>
         <SkinSwitcher compact={compact} />
       </div>
@@ -141,7 +158,7 @@ export default function RoutePlanner({
               <button
                 type="button"
                 onClick={() => onRouteViaChange([...routeVia, ''])}
-                className="min-h-9 rounded-lg px-3 text-[11px] font-bold"
+                className="min-h-10 rounded-xl px-3 text-[11px] font-bold"
                 style={{
                   background: 'var(--surface-soft)',
                   color: 'var(--text-secondary)',
@@ -151,31 +168,57 @@ export default function RoutePlanner({
                 ＋ 途經點
               </button>
             )}
-            {googleMapsUrl ? (
-              <a
-                href={googleMapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-auto inline-flex min-h-9 items-center rounded-lg px-3 text-[11px] font-black"
-                style={{ background: '#fff', color: '#111827' }}
-              >
-                Google Maps ↗
-              </a>
-            ) : (
-              <span className="ml-auto text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                填入起點與終點
-              </span>
-            )}
+
+            <button
+              type="button"
+              onClick={onPlanRoute}
+              disabled={!canPlan || routePlanning}
+              className="ml-auto min-h-10 rounded-xl px-4 text-[11px] font-black disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ background: 'var(--accent-freeway)', color: '#fff' }}
+            >
+              {routePlanning ? '規畫中…' : '規畫路線'}
+            </button>
           </div>
 
-          {!compact && (
-            <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              道路模式已支援沿線 CCTV 排列與自動播放；路線模式後續會把多道路路廊串成同一播放序列。Google Maps URL 不需要 API Key。
-            </p>
+          {routeError && (
+            <div
+              className="rounded-lg px-2.5 py-2 text-[10px] font-bold"
+              style={{
+                background: 'rgba(239,68,68,.10)',
+                color: '#fca5a5',
+                border: '1px solid rgba(239,68,68,.22)',
+              }}
+            >
+              {routeError}
+            </div>
           )}
-          {routeVia.filter((item) => item.trim()).length > 3 && (
-            <p className="text-[10px]" style={{ color: '#fbbf24' }}>
-              手機瀏覽器的 Google Maps URL 最多支援 3 個途經點；站內仍會保留完整多點路線。
+
+          {routeResult && (
+            <div
+              className="rounded-xl px-3 py-2"
+              style={{ background: 'var(--surface-soft)', border: '1px solid var(--border-subtle)' }}
+            >
+              <div
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-black"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <span>✓ {formatDistance(routeResult.distanceMeters)}</span>
+                <span>{formatDuration(routeResult.durationSeconds)}</span>
+                <span style={{ color: 'var(--accent-freeway)' }}>
+                  沿途 CCTV {routeCameraCount ?? 0} 支
+                </span>
+              </div>
+              {!compact && (
+                <div className="mt-1 truncate text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                  {routeResult.stops.map((stop) => stop.label).join(' → ')}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!routeResult && !routeError && !compact && (
+            <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              按「規畫路線」後會直接在站內畫路線，並自動排列路線附近 CCTV；不再依賴 Google Maps。
             </p>
           )}
         </div>
